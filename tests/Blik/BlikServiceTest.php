@@ -45,7 +45,7 @@ final class BlikServiceTest extends TestCase
 
         $request = $this->http->lastRequest();
         self::assertSame('https://api-payments.dpay.pl/api/v1_0/payments/blik/aliases', $request->getUrl());
-        $body = json_decode((string) $request->getBody(), true);
+        $body = $this->http->lastRequestBody();
         self::assertSame(['service', 'alias_value', 'alias_type', 'checksum'], array_keys($body));
         self::assertSame(
             '231f56ec6cae2209e0743a34ad2a2e38c43dd78df63cafffe69a9ea2c4fb3490',
@@ -59,7 +59,7 @@ final class BlikServiceTest extends TestCase
 
         $this->service->unregisterAlias('DPAY.UID.123456.abc12345', 'UID', 'customer request');
 
-        $body = json_decode((string) $this->http->lastRequest()->getBody(), true);
+        $body = $this->http->lastRequestBody();
         self::assertSame(['service', 'alias_value', 'alias_type', 'reason', 'checksum'], array_keys($body));
         self::assertSame('customer request', $body['reason']);
     }

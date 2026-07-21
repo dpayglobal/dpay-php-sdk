@@ -54,6 +54,19 @@ final class MockHttpClient implements HttpClientInterface
         return $response;
     }
 
+    /**
+     * @return array<mixed>
+     */
+    public function lastRequestBody(): array
+    {
+        $decoded = json_decode((string) $this->lastRequest()->getBody(), true);
+        if (!is_array($decoded)) {
+            throw new LogicException('Last request has no JSON object body');
+        }
+
+        return $decoded;
+    }
+
     public function lastRequest(): ApiRequest
     {
         $last = end($this->requests);

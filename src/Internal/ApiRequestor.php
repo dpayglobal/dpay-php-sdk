@@ -94,10 +94,14 @@ final class ApiRequestor
         $encoded = null;
         if ($body !== null) {
             $headers['Content-Type'] = 'application/json';
+            $previousPrecision = ini_set('serialize_precision', '-1');
             $encoded = json_encode(
                 $body === [] ? new stdClass() : $body,
                 JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
             );
+            if ($previousPrecision !== false) {
+                ini_set('serialize_precision', $previousPrecision);
+            }
             if ($encoded === false) {
                 throw new TransportException('Unable to encode request body as JSON');
             }

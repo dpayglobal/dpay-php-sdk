@@ -57,7 +57,7 @@ final class PayoutServiceTest extends TestCase
         self::assertNotNull($receiver);
         self::assertSame('PL61109010140000071219812874', $receiver->getNrb());
 
-        $body = json_decode((string) $this->http->lastRequest()->getBody(), true);
+        $body = $this->http->lastRequestBody();
         self::assertSame(['service', 'withdraw_id', 'checksum'], array_keys($body));
         self::assertSame(
             '9c7f5305d2de640ed3d1915f6ca33d6040b1583fab56676d0fcdcf65765b223d',
@@ -71,7 +71,7 @@ final class PayoutServiceTest extends TestCase
 
         $this->service->details(12345, 1753100000);
 
-        $body = json_decode((string) $this->http->lastRequest()->getBody(), true);
+        $body = $this->http->lastRequestBody();
         self::assertSame(['service', 'timestamp', 'withdraw_id', 'checksum'], array_keys($body));
     }
 

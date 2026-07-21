@@ -51,7 +51,7 @@ final class BankServiceTest extends TestCase
 
         self::assertCount(1, $banks);
         self::assertSame('paybylink', $banks[0]->getType());
-        $body = json_decode((string) $this->http->lastRequest()->getBody(), true);
+        $body = $this->http->lastRequestBody();
         self::assertSame(['service', 'timestamp', 'checksum'], array_keys($body));
         self::assertSame(1753100000, $body['timestamp']);
         self::assertSame(
@@ -66,7 +66,7 @@ final class BankServiceTest extends TestCase
 
         $this->service->forService();
 
-        $body = json_decode((string) $this->http->lastRequest()->getBody(), true);
+        $body = $this->http->lastRequestBody();
         self::assertEqualsWithDelta(time(), $body['timestamp'], 5);
     }
 }

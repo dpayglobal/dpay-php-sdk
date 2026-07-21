@@ -33,7 +33,7 @@ final class RefundServiceTest extends TestCase
 
         self::assertTrue($refund->isAccepted());
         self::assertSame('MSG-1', $refund->getMessage());
-        $body = json_decode((string) $this->http->lastRequest()->getBody(), true);
+        $body = $this->http->lastRequestBody();
         self::assertSame(['service', 'transaction_id', 'checksum'], array_keys($body));
         self::assertSame(
             '3b345f55900ae6a43220dd14a3827ed9a26a02a3eb46b856d302e2baa44b48a4',
@@ -47,7 +47,7 @@ final class RefundServiceTest extends TestCase
 
         $this->service->create('30D9493D-1D73-3FBD-A5D4-633723CC7A68', Money::pln(1500), 'reklamacja');
 
-        $body = json_decode((string) $this->http->lastRequest()->getBody(), true);
+        $body = $this->http->lastRequestBody();
         self::assertSame(['service', 'transaction_id', 'value', 'reason', 'checksum'], array_keys($body));
         self::assertSame('15.00', $body['value']);
         self::assertSame(
@@ -99,5 +99,34 @@ final class RefundServiceTest extends TestCase
 
         self::assertFalse($availability->isAvailable());
         self::assertSame('Transakcja nie została opłacona', $availability->getMessage());
+        self::assertSame(402, $availability->getHttpStatus());
+    }
+
+    public function testAvailabilityAlreadyRefundedOn410IsNotAnException(): void
+    {
+        $this->http->queueJson(410, [
+            'status' => 'error',
+            'refund' => false,
+            'message' => 'Transakcja została zwrócona wcześniej',
+        ]);
+
+        $availability = $this->service->checkAvailability('TX-1');
+
+        self::assertFalse($availability->isAvailable());
+        self::assertSame(410, $availability->getHttpStatus());
+    }
+
+    public function testAvailabilityNonRefundableChannelOnBusiness401IsNotAnException(): void
+    {
+        $this->http->queueJson(401, [
+            'status' => 'error',
+            'refund' => false,
+            'message' => 'Transakcji dokonanych kanałami paysafecard nie można zwrócić',
+        ]);
+
+        $availability = $this->service->checkAvailability('TX-1');
+
+        self::assertFalse($availability->isAvailable());
+        self::assertSame(401, $availability->getHttpStatus());
     }
 }

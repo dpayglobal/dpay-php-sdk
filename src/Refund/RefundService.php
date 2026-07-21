@@ -34,11 +34,23 @@ final class RefundService
         $data = $response->decodeJson();
 
         $status = $response->getStatus();
-        if (in_array($status, [200, 400, 402], true) && is_array($data) && array_key_exists('refund', $data)) {
-            return RefundAvailability::fromArray($data);
+        if (is_array($data) && array_key_exists('refund', $data) && $this->isAvailabilityOutcome($status, $data)) {
+            return RefundAvailability::fromArray($data, $status);
         }
 
         throw $this->api->mapError($response);
+    }
+
+    /**
+     * @param array<mixed> $data
+     */
+    private function isAvailabilityOutcome(int $status, array $data): bool
+    {
+        if (in_array($status, [200, 400, 402, 406, 409, 410, 411], true)) {
+            return true;
+        }
+
+        return $status === 401 && ($data['message'] ?? null) !== 'Unauthorized request';
     }
 
     /**

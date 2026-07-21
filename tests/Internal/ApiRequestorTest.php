@@ -96,4 +96,20 @@ final class ApiRequestorTest extends TestCase
 
         self::assertSame(400, $response->getStatus());
     }
+
+    public function testFloatAmountsEncodeShortestFormRegardlessOfIni(): void
+    {
+        $previous = ini_set('serialize_precision', '17');
+        try {
+            $this->http->queueJson(200, ['status' => 'success']);
+
+            $this->api->postJson(BaseUrls::API_PAYMENTS, '/x', ['amount' => 59.99]);
+
+            self::assertSame('{"amount":59.99}', $this->http->lastRequest()->getBody());
+        } finally {
+            if ($previous !== false) {
+                ini_set('serialize_precision', $previous);
+            }
+        }
+    }
 }

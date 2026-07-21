@@ -42,4 +42,16 @@ final class BlikRecurringRegistrationTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         BlikRecurringRegistration::create('X', 'B', '30D');
     }
+
+    public function testRejectsBadExpirationDate(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        BlikRecurringRegistration::create('X', 'A', '30D')->withExpirationDate('01-08-2026');
+    }
+
+    public function testRejectsBadInitDate(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        BlikRecurringRegistration::create('X', 'A', '30D')->withInitDate('2026/08/01');
+    }
 }

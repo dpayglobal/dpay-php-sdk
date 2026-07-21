@@ -28,4 +28,12 @@ final class CurrencyTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         Currency::assertValid('pln');
     }
+
+    public function testIsValid(): void
+    {
+        self::assertTrue(Currency::isValid('PLN'));
+        self::assertFalse(Currency::isValid('pln'));
+        self::assertFalse(Currency::isValid('PLNX'));
+        self::assertFalse(Currency::isValid(''));
+    }
 }

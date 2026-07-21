@@ -77,10 +77,12 @@ final class CardServiceTest extends TestCase
         self::assertSame(RedirectType::SUCCESS, $result->getRedirectType());
         $request = $this->http->lastRequest();
         self::assertSame('https://api-payments.dpay.pl/api/v1_0/cards/payment/TX-1/pay/card-otp', $request->getUrl());
-        $body = json_decode((string) $request->getBody(), true);
+        $body = $this->http->lastRequestBody();
         self::assertSame(31, $body['channelId']);
         self::assertSame('BASE64DATA', $body['encryptedCardData']);
-        self::assertSame('device-1', $body['deviceInfo']['deviceID']);
+        $deviceInfoBody = $body['deviceInfo'];
+        self::assertIsArray($deviceInfoBody);
+        self::assertSame('device-1', $deviceInfoBody['deviceID']);
     }
 
     public function testPayOtpThreeDsForm(): void
@@ -97,6 +99,23 @@ final class CardServiceTest extends TestCase
         self::assertTrue($result->requiresThreeDsForm());
         self::assertSame($formHtml, $result->getThreeDsFormHtml());
         self::assertNull($result->getRedirectUrl());
+    }
+
+    public function testPayOtpUrlRedirect(): void
+    {
+        $url = 'https://acs.example/challenge?tx=1';
+        $this->http->queueJson(200, [
+            'success' => true,
+            'status' => 'success',
+            'message' => ['redirectText' => base64_encode($url), 'redirectType' => 'URL'],
+        ]);
+
+        $result = $this->service->payOtp('TX-1', $this->request());
+
+        self::assertTrue($result->requiresRedirect());
+        self::assertFalse($result->isSuccess());
+        self::assertSame($url, $result->getRedirectUrl());
+        self::assertNull($result->getThreeDsFormHtml());
     }
 
     public function testPayOtpDccOffer(): void
@@ -147,7 +166,7 @@ final class CardServiceTest extends TestCase
 
         $this->service->payOtp('TX-1', $this->request()->withDccDecision(DccDecision::ACCEPT));
 
-        $body = json_decode((string) $this->http->lastRequest()->getBody(), true);
+        $body = $this->http->lastRequestBody();
         self::assertSame('accept', $body['dccDecision']);
     }
 
@@ -254,7 +273,7 @@ final class CardServiceTest extends TestCase
 
         $this->service->googlePay('TX-1', $googlePay);
 
-        $body = json_decode((string) $this->http->lastRequest()->getBody(), true);
+        $body = $this->http->lastRequestBody();
         self::assertSame('GOOGLE_PAY', $body['xPayType']);
         self::assertSame('TOKEN123', $body['xPayToken']);
         self::assertSame('client@example.com', $body['email']);
@@ -284,7 +303,7 @@ final class CardServiceTest extends TestCase
 
         $this->service->applePay('TX-1', $applePay);
 
-        $body = json_decode((string) $this->http->lastRequest()->getBody(), true);
+        $body = $this->http->lastRequestBody();
         self::assertSame('APPLE_PAY_INIT', $body['xPayType']);
         self::assertArrayNotHasKey('xPayToken', $body);
     }

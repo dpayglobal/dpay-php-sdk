@@ -4,6 +4,17 @@
     "type": "library",
     "license": "Apache-2.0",
     "keywords": ["dpay", "payments", "blik", "cards", "sdk"],
+    "homepage": "https://dpay.pl",
+    "authors": [
+        {
+            "name": "dpay",
+            "homepage": "https://dpay.pl"
+        }
+    ],
+    "support": {
+        "docs": "https://docs.dpay.pl",
+        "issues": "https://github.com/dpayglobal/dpay-php-library-src/issues"
+    },
     "require": {
         "php": ">=7.4",
         "ext-curl": "*",

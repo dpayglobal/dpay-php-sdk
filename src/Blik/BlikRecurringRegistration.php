@@ -78,16 +78,25 @@ final class BlikRecurringRegistration
 
     public function withExpirationDate(string $expirationDate): self
     {
-        $this->expirationDate = $expirationDate;
+        $this->expirationDate = $this->assertDate($expirationDate);
 
         return $this;
     }
 
     public function withInitDate(string $initDate): self
     {
-        $this->initDate = $initDate;
+        $this->initDate = $this->assertDate($initDate);
 
         return $this;
+    }
+
+    private function assertDate(string $date): string
+    {
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) !== 1) {
+            throw new InvalidArgumentException(sprintf('Date "%s" must be in YYYY-MM-DD format', $date));
+        }
+
+        return $date;
     }
 
     /**

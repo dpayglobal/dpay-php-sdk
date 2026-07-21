@@ -63,7 +63,7 @@ final class Money
      */
     public static function tryFromApiNumber($value, string $currency): ?self
     {
-        if (preg_match('/^[A-Z]{3}$/', $currency) !== 1) {
+        if (!Currency::isValid($currency)) {
             return null;
         }
         if (is_int($value)) {

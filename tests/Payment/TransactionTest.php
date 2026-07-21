@@ -11,7 +11,7 @@ use PHPUnit\Framework\TestCase;
 final class TransactionTest extends TestCase
 {
     /**
-     * @return array<mixed>
+     * @return array{status: string, transaction: array<string, mixed>, payer: array<mixed>, refunds: array<int, array<string, mixed>>}
      */
     private function fixture(): array
     {

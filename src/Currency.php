@@ -12,9 +12,14 @@ final class Currency
     public const EUR = 'EUR';
     public const CZK = 'CZK';
 
+    public static function isValid(string $currency): bool
+    {
+        return preg_match('/^[A-Z]{3}$/', $currency) === 1;
+    }
+
     public static function assertValid(string $currency): void
     {
-        if (preg_match('/^[A-Z]{3}$/', $currency) !== 1) {
+        if (!self::isValid($currency)) {
             throw new InvalidArgumentException(sprintf('Invalid currency code "%s"', $currency));
         }
     }

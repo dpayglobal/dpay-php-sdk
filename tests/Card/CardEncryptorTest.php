@@ -19,6 +19,7 @@ final class CardEncryptorTest extends TestCase
         $details = openssl_pkey_get_details($keyPair);
         self::assertIsArray($details);
         $publicPem = $details['key'];
+        self::assertIsString($publicPem);
 
         $encryptor = new CardEncryptor();
         $encrypted = $encryptor->encrypt(
@@ -27,9 +28,13 @@ final class CardEncryptorTest extends TestCase
             $publicPem
         );
 
+        $cipher = base64_decode($encrypted, true);
+        self::assertIsString($cipher);
         $decrypted = '';
-        self::assertTrue(openssl_private_decrypt(base64_decode($encrypted, true), $decrypted, $keyPair, OPENSSL_PKCS1_PADDING));
+        self::assertTrue(openssl_private_decrypt($cipher, $decrypted, $keyPair, OPENSSL_PKCS1_PADDING));
+        self::assertIsString($decrypted);
         $payload = json_decode($decrypted, true);
+        self::assertIsArray($payload);
         self::assertSame('4111111111111111', $payload['PN']);
         self::assertSame('123', $payload['SC']);
         self::assertSame('12/30', $payload['DT']);

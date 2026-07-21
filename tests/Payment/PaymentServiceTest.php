@@ -57,7 +57,7 @@ final class PaymentServiceTest extends TestCase
 
         $request = $this->http->lastRequest();
         self::assertSame('https://api-payments.dpay.pl/api/v1_0/payments/register', $request->getUrl());
-        $body = json_decode((string) $request->getBody(), true);
+        $body = $this->http->lastRequestBody();
         self::assertSame(
             'ae7fd11b457d6fc41edd193dfb0dd42b471bd6d312c1ae12dffeb931371c4cd2',
             $body['checksum']
@@ -130,7 +130,7 @@ final class PaymentServiceTest extends TestCase
         self::assertSame('30D9493D-1D73-3FBD-A5D4-633723CC7A68', $transaction->getId());
         $request = $this->http->lastRequest();
         self::assertSame('https://panel.dpay.pl/api/v1/pbl/details', $request->getUrl());
-        $body = json_decode((string) $request->getBody(), true);
+        $body = $this->http->lastRequestBody();
         self::assertSame(['service', 'transaction_id', 'checksum'], array_keys($body));
         self::assertSame(
             '3b345f55900ae6a43220dd14a3827ed9a26a02a3eb46b856d302e2baa44b48a4',

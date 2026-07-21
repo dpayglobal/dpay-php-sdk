@@ -6,7 +6,7 @@ namespace DPay;
 
 final class Version
 {
-    public const SDK = '0.1.0';
+    public const SDK = '0.1.1';
 
     private function __construct()
     {

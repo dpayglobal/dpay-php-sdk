@@ -182,9 +182,14 @@ final class RegisterPaymentRequestTest extends TestCase
             ->withPayout($payout)
             ->toBody('MyShop');
 
-        self::assertSame('gross', $body['payout']['fee_mode']);
-        self::assertSame('PL61109010140000071219812874', $body['payout']['positions'][0]['iban']);
-        self::assertSame(250.0, $body['payout']['positions'][0]['amount']);
+        $payoutBody = $body['payout'];
+        self::assertIsArray($payoutBody);
+        self::assertSame('gross', $payoutBody['fee_mode']);
+        self::assertIsArray($payoutBody['positions']);
+        $position = $payoutBody['positions'][0];
+        self::assertIsArray($position);
+        self::assertSame('PL61109010140000071219812874', $position['iban']);
+        self::assertSame(250.0, $position['amount']);
     }
 
     public function testEfakturaWithInvoice(): void
@@ -199,8 +204,10 @@ final class RegisterPaymentRequestTest extends TestCase
             ->toBody('MyShop');
 
         self::assertTrue($body['efaktura']);
-        self::assertSame('5252248481', $body['invoice']['payer_nip']);
-        self::assertSame(11500, $body['invoice']['vat_amount']);
+        $invoiceBody = $body['invoice'];
+        self::assertIsArray($invoiceBody);
+        self::assertSame('5252248481', $invoiceBody['payer_nip']);
+        self::assertSame(11500, $invoiceBody['vat_amount']);
     }
 
     public function testEfakturaRequiresTransfers(): void

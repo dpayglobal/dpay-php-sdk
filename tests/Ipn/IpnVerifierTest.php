@@ -80,9 +80,16 @@ final class IpnVerifierTest extends TestCase
 
     public function testCaptureExposesCapturePaymentId(): void
     {
-        $raw = json_decode($this->transferPayload(), true);
-        $raw['type'] = 'capture';
-        $raw['capture_payment_id'] = 'CAP-1';
+        $raw = [
+            'id' => '30D9493D-1D73-3FBD-A5D4-633723CC7A68',
+            'amount' => '10.00',
+            'email' => 'client@example.com',
+            'type' => 'capture',
+            'attempt' => 1,
+            'version' => 1,
+            'custom' => 'order-1234',
+            'capture_payment_id' => 'CAP-1',
+        ];
         $concat = $raw['id'] . 'secret123' . $raw['amount'] . $raw['email'] . 'capture'
             . $raw['attempt'] . $raw['version'] . $raw['custom'];
         $raw['signature'] = hash('sha256', $concat);
