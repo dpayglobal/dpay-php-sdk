@@ -13,7 +13,7 @@
     ],
     "support": {
         "docs": "https://docs.dpay.pl",
-        "issues": "https://github.com/dpayglobal/dpay-php-library-src/issues"
+        "issues": "https://github.com/dpayglobal/dpay-php-sdk/issues"
     },
     "require": {
         "php": ">=7.4",
