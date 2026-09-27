@@ -57,6 +57,7 @@ final class IpnEvent
         return $this->getType() === IpnType::TRANSFER;
     }
 
+    /** @deprecated dpay no longer sends capture IPNs - use the `payment.captured` webhook event. */
     public function isCapture(): bool
     {
         return $this->getType() === IpnType::CAPTURE;
@@ -85,6 +86,7 @@ final class IpnEvent
         return isset($custom) && is_scalar($custom) ? (string) $custom : null;
     }
 
+    /** @deprecated dpay no longer sends capture IPNs - use the `payment.captured` webhook event. */
     public function getCapturePaymentId(): ?string
     {
         $capturePaymentId = $this->raw['capture_payment_id'] ?? null;

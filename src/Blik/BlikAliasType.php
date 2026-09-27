@@ -8,12 +8,11 @@ use InvalidArgumentException;
 
 final class BlikAliasType
 {
+    /** BLIK OneClick alias. Recurring payments (PAYID) are handled by DPayClient::$recurring. */
     public const UID = 'UID';
-    public const PAYID = 'PAYID';
 
     public const ALL = [
         self::UID,
-        self::PAYID,
     ];
 
     public static function assertValid(string $value): void

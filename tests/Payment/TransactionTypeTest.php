@@ -14,7 +14,20 @@ final class TransactionTypeTest extends TestCase
     {
         self::assertSame('transfers', TransactionType::TRANSFERS);
         self::assertSame('card_recurring', TransactionType::CARD_RECURRING);
-        self::assertCount(7, TransactionType::ALL);
+        self::assertCount(5, TransactionType::ALL);
+    }
+
+    public function testRemovedTypesAreRejected(): void
+    {
+        // blik_recurring: rejestracja przez recurring_registration; bizum_direct: API go nie obsługuje
+        foreach (['blik_recurring', 'bizum_direct'] as $removed) {
+            try {
+                TransactionType::assertValid($removed);
+                self::fail(sprintf('%s should be rejected', $removed));
+            } catch (InvalidArgumentException $exception) {
+                $this->addToAssertionCount(1);
+            }
+        }
     }
 
     public function testAssertValidAcceptsKnownValue(): void

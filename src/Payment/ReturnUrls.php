@@ -12,12 +12,15 @@ final class ReturnUrls
 
     private string $fail;
 
-    private string $ipn;
+    private ?string $ipn;
 
-    public function __construct(string $success, string $fail, string $ipn)
+    /**
+     * @param string|null $ipn IPN URL; without it no IPN is sent (use webhooks instead)
+     */
+    public function __construct(string $success, string $fail, ?string $ipn = null)
     {
         foreach (['success' => $success, 'fail' => $fail, 'ipn' => $ipn] as $name => $url) {
-            if (filter_var($url, FILTER_VALIDATE_URL) === false) {
+            if ($url !== null && filter_var($url, FILTER_VALIDATE_URL) === false) {
                 throw new InvalidArgumentException(sprintf('Invalid %s URL "%s"', $name, $url));
             }
         }
@@ -36,7 +39,7 @@ final class ReturnUrls
         return $this->fail;
     }
 
-    public function getIpn(): string
+    public function getIpn(): ?string
     {
         return $this->ipn;
     }

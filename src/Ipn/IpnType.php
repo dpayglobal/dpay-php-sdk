@@ -9,6 +9,7 @@ use InvalidArgumentException;
 final class IpnType
 {
     public const TRANSFER = 'transfer';
+    /** @deprecated dpay no longer sends capture IPNs - use the `payment.captured` webhook event. */
     public const CAPTURE = 'capture';
     public const DCB = 'dcb';
 

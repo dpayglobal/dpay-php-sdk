@@ -82,6 +82,35 @@ final class RegisteredPayment
         return null;
     }
 
+    /** Alias of the recurring payment registered with this payment (withRecurringRegistration). */
+    public function getRecurringAlias(): ?string
+    {
+        $registration = $this->recurringRegistration();
+
+        return isset($registration['alias']) && is_string($registration['alias']) ? $registration['alias'] : null;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function getRecurringMethods(): array
+    {
+        $methods = $this->recurringRegistration()['methods'] ?? null;
+
+        return is_array($methods) ? array_values(array_filter($methods, 'is_string')) : [];
+    }
+
+    /**
+     * @return array<mixed>
+     */
+    private function recurringRegistration(): array
+    {
+        $additional = $this->raw['additionalInfo'] ?? null;
+        $registration = is_array($additional) ? ($additional['recurring_registration'] ?? null) : null;
+
+        return is_array($registration) ? $registration : [];
+    }
+
     /**
      * @return array<mixed>
      */

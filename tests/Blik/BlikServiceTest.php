@@ -63,49 +63,4 @@ final class BlikServiceTest extends TestCase
         self::assertSame(['service', 'alias_value', 'alias_type', 'reason', 'checksum'], array_keys($body));
         self::assertSame('customer request', $body['reason']);
     }
-
-    public function testRecurringStatus(): void
-    {
-        $this->http->queueJson(200, [
-            'status' => 'success',
-            'data' => [
-                'alias_value' => 'PAYID-1',
-                'alias_type' => 'PAYID',
-                'status' => 'ACTIVE',
-                'expiration_date' => null,
-                'registration' => [
-                    'model' => 'A',
-                    'frequency' => '30D',
-                    'limit_amt' => 5999,
-                    'tot_limit_amt' => null,
-                    'is_limit_amt_fixed' => false,
-                    'init_date' => '2026-07-01',
-                    'label' => 'Subskrypcja',
-                    'registered_at' => '2026-07-01T10:00:00+02:00',
-                ],
-            ],
-        ]);
-
-        $status = $this->service->recurringStatus('PAYID-1');
-
-        self::assertTrue($status->isActive());
-        $registration = $status->getRegistration();
-        self::assertNotNull($registration);
-        self::assertSame('A', $registration->getModel());
-        self::assertSame('30D', $registration->getFrequency());
-        self::assertSame(5999, $registration->getLimitAmt());
-    }
-
-    public function testRecurringStatusWithoutRegistration(): void
-    {
-        $this->http->queueJson(200, [
-            'status' => 'success',
-            'data' => ['alias_value' => 'PAYID-1', 'alias_type' => 'PAYID', 'status' => null, 'registration' => null],
-        ]);
-
-        $status = $this->service->recurringStatus('PAYID-1');
-
-        self::assertFalse($status->isActive());
-        self::assertNull($status->getRegistration());
-    }
 }

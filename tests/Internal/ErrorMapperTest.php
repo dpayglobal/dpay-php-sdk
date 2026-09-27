@@ -98,4 +98,23 @@ final class ErrorMapperTest extends TestCase
         self::assertInstanceOf(InvalidRequestException::class, $exception);
         self::assertSame(['a' => ['ok']], $exception->getFieldErrors());
     }
+
+    public function testMapsTheCodeAndReasonOfCardsAndWebhookErrors(): void
+    {
+        $body = '{"success":false,"status":"error","code":"WEBHOOK_URL_INVALID","reason":"https_required","message":"Invalid webhook URL: https_required"}';
+        $exception = $this->mapper->map(new ApiResponse(400, [], $body));
+
+        self::assertInstanceOf(InvalidRequestException::class, $exception);
+        self::assertSame('WEBHOOK_URL_INVALID', $exception->getErrorCode());
+        self::assertSame('https_required', $exception->getReason());
+    }
+
+    public function testMapsAMissingChecksumToAnAuthenticationError(): void
+    {
+        $body = '{"success":false,"status":"error","code":"CHECKSUM_REQUIRED","message":"Missing service or checksum"}';
+        $exception = $this->mapper->map(new ApiResponse(401, [], $body));
+
+        self::assertInstanceOf(\DPay\Exception\AuthenticationException::class, $exception);
+        self::assertSame('CHECKSUM_REQUIRED', $exception->getErrorCode());
+    }
 }

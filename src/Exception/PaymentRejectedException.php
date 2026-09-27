@@ -8,6 +8,8 @@ final class PaymentRejectedException extends ApiErrorException
 {
     private ?string $transactionId = null;
 
+    private ?string $errorDescription = null;
+
     /**
      * @param array<mixed> $data
      */
@@ -23,6 +25,9 @@ final class PaymentRejectedException extends ApiErrorException
         if (is_scalar($transactionId)) {
             $exception->transactionId = (string) $transactionId;
         }
+        if (isset($additional['error_description']) && is_string($additional['error_description'])) {
+            $exception->errorDescription = $additional['error_description'];
+        }
 
         return $exception;
     }
@@ -30,5 +35,11 @@ final class PaymentRejectedException extends ApiErrorException
     public function getTransactionId(): ?string
     {
         return $this->transactionId;
+    }
+
+    /** Provider's description of the decline, when it sent one. */
+    public function getErrorDescription(): ?string
+    {
+        return $this->errorDescription;
     }
 }

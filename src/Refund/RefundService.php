@@ -7,6 +7,8 @@ namespace DPay\Refund;
 use DPay\Internal\ApiRequestor;
 use DPay\Internal\BaseUrls;
 use DPay\Money;
+use DPay\Webhook\WebhookEventType;
+use DPay\Webhook\WebhookTarget;
 
 final class RefundService
 {
@@ -17,9 +19,17 @@ final class RefundService
         $this->api = $api;
     }
 
-    public function create(string $transactionId, ?Money $amount = null, ?string $reason = null): Refund
+    /**
+     * Orders a refund (partial with an amount, the rest of the payment without). A 200 response means the refund
+     * was accepted - its outcome comes as a `refund.succeeded` / `refund.failed` event. The optional webhook target
+     * receives the events of this refund and is part of the checksum.
+     */
+    public function create(string $transactionId, ?Money $amount = null, ?string $reason = null, ?WebhookTarget $webhook = null): Refund
     {
-        $body = $this->signedBody($transactionId, $amount, $reason);
+        if ($webhook !== null) {
+            $webhook->assertEventsAllowed(WebhookEventType::REFUND, 'a refund');
+        }
+        $body = $this->signedBody($transactionId, $amount, $reason, $webhook);
 
         $data = $this->api->postJson(BaseUrls::PANEL, '/api/v1/pbl/refund', $body);
 
@@ -56,7 +66,7 @@ final class RefundService
     /**
      * @return array<string, mixed>
      */
-    private function signedBody(string $transactionId, ?Money $amount, ?string $reason): array
+    private function signedBody(string $transactionId, ?Money $amount, ?string $reason, ?WebhookTarget $webhook = null): array
     {
         $body = [
             'service' => $this->api->config()->service(),
@@ -68,7 +78,10 @@ final class RefundService
         if ($reason !== null) {
             $body['reason'] = $reason;
         }
-        $body['checksum'] = $this->api->checksum()->orderedBody(array_values($body));
+        if ($webhook !== null) {
+            $body['webhook'] = $webhook->toArray();
+        }
+        $body['checksum'] = $this->api->checksum()->orderedBody($body);
 
         return $body;
     }

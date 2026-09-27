@@ -29,9 +29,12 @@ final class ErrorMapper
         }
 
         $errorCode = null;
-        if (isset($data['errorcode']) && is_string($data['errorcode'])) {
+        if (isset($data['code']) && is_string($data['code'])) {
+            $errorCode = $data['code'];
+        } elseif (isset($data['errorcode']) && is_string($data['errorcode'])) {
             $errorCode = $data['errorcode'];
         }
+        $reason = isset($data['reason']) && is_string($data['reason']) ? $data['reason'] : null;
 
         $fieldErrors = $this->normalizeFieldErrors($data['errors'] ?? null);
 
@@ -48,17 +51,17 @@ final class ErrorMapper
 
         switch (true) {
             case $status === 401:
-                return new AuthenticationException($message, $status, $errorCode, $fieldErrors, $rawBody);
+                return new AuthenticationException($message, $status, $errorCode, $fieldErrors, $rawBody, $reason);
             case $status === 403:
-                return new PermissionException($message, $status, $errorCode, $fieldErrors, $rawBody);
+                return new PermissionException($message, $status, $errorCode, $fieldErrors, $rawBody, $reason);
             case $status === 404:
-                return new NotFoundException($message, $status, $errorCode, $fieldErrors, $rawBody);
+                return new NotFoundException($message, $status, $errorCode, $fieldErrors, $rawBody, $reason);
             case $status === 400 || $status === 422:
-                return new InvalidRequestException($message, $status, $errorCode, $fieldErrors, $rawBody);
+                return new InvalidRequestException($message, $status, $errorCode, $fieldErrors, $rawBody, $reason);
             case $status >= 500:
-                return new ApiServerException($message, $status, $errorCode, $fieldErrors, $rawBody);
+                return new ApiServerException($message, $status, $errorCode, $fieldErrors, $rawBody, $reason);
             default:
-                return new ApiErrorException($message, $status, $errorCode, $fieldErrors, $rawBody);
+                return new ApiErrorException($message, $status, $errorCode, $fieldErrors, $rawBody, $reason);
         }
     }
 

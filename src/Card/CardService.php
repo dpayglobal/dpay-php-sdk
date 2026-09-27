@@ -8,6 +8,8 @@ use DPay\Exception\CardPaymentException;
 use DPay\Internal\ApiRequestor;
 use DPay\Internal\BaseUrls;
 use DPay\Money;
+use DPay\Webhook\WebhookEventType;
+use DPay\Webhook\WebhookTarget;
 
 final class CardService
 {
@@ -33,14 +35,40 @@ final class CardService
         return $this->post($transactionId, '/pay/card-pre-auth', $request->toBody());
     }
 
-    public function capture(string $transactionId, Money $amount): CardPaymentResult
+    /**
+     * Captures a pre-authorised amount (partial captures allowed up to the authorisation). Signed with
+     * sha256(capture|service|transaction_id|amount|hash). Optional webhook target for `payment.captured`.
+     */
+    public function capture(string $transactionId, Money $amount, ?WebhookTarget $webhook = null): CardPaymentResult
     {
-        return $this->post($transactionId, '/capture', ['amount' => (float) $amount->toDecimal()]);
+        $service = $this->api->config()->service();
+        $body = ['service' => $service, 'amount' => (float) $amount->toDecimal()];
+        if ($webhook !== null) {
+            $webhook->assertEventsAllowed(WebhookEventType::CAPTURE, 'a card capture');
+            $body['webhook'] = $webhook->toArray();
+        }
+        $body['checksum'] = $this->api->checksum()->operation('capture', $service, $transactionId, $amount->toDecimal());
+
+        return $this->post($transactionId, '/capture', $body);
     }
 
+    /**
+     * Cancels the pre-authorisation, the whole uncaptured remainder without an amount. Signed with
+     * sha256(cancellation|service|transaction_id|amount|hash) - empty amount segment without an amount.
+     */
     public function cancel(string $transactionId, ?Money $amount = null): CardPaymentResult
     {
-        $body = $amount === null ? [] : ['amount' => (float) $amount->toDecimal()];
+        $service = $this->api->config()->service();
+        $body = ['service' => $service];
+        if ($amount !== null) {
+            $body['amount'] = (float) $amount->toDecimal();
+        }
+        $body['checksum'] = $this->api->checksum()->operation(
+            'cancellation',
+            $service,
+            $transactionId,
+            $amount === null ? null : $amount->toDecimal()
+        );
 
         return $this->post($transactionId, '/cancellation', $body);
     }

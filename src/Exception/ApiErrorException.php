@@ -17,6 +17,8 @@ class ApiErrorException extends RuntimeException implements ExceptionInterface
 
     private string $rawBody;
 
+    private ?string $reason;
+
     /**
      * @param array<string, array<int, string>> $fieldErrors
      */
@@ -25,13 +27,21 @@ class ApiErrorException extends RuntimeException implements ExceptionInterface
         int $httpStatus,
         ?string $errorCode = null,
         array $fieldErrors = [],
-        string $rawBody = ''
+        string $rawBody = '',
+        ?string $reason = null
     ) {
         parent::__construct($message);
         $this->httpStatus = $httpStatus;
         $this->errorCode = $errorCode;
         $this->fieldErrors = $fieldErrors;
         $this->rawBody = $rawBody;
+        $this->reason = $reason;
+    }
+
+    /** Detailed reason next to the code, e.g. `https_required` for WEBHOOK_URL_INVALID. */
+    public function getReason(): ?string
+    {
+        return $this->reason;
     }
 
     public function getHttpStatus(): int
