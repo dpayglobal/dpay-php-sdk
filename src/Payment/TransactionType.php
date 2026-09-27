@@ -12,8 +12,6 @@ final class TransactionType
     public const DCB_GATEWAY = 'dcb_gateway';
     public const CARD_AUTH = 'card_auth';
     public const MB_WAY_DIRECT = 'mb_way_direct';
-    public const BIZUM_DIRECT = 'bizum_direct';
-    public const BLIK_RECURRING = 'blik_recurring';
     public const CARD_RECURRING = 'card_recurring';
 
     public const ALL = [
@@ -21,8 +19,6 @@ final class TransactionType
         self::DCB_GATEWAY,
         self::CARD_AUTH,
         self::MB_WAY_DIRECT,
-        self::BIZUM_DIRECT,
-        self::BLIK_RECURRING,
         self::CARD_RECURRING,
     ];
 

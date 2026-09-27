@@ -22,6 +22,11 @@ final class CurlHttpClient implements HttpClientInterface
             throw new TransportException('Unable to initialize cURL');
         }
 
+        $method = $request->getMethod();
+        if ($method === '') {
+            throw new TransportException('HTTP method must not be empty');
+        }
+
         $responseHeaders = [];
         $headerLines = [];
         foreach ($request->getHeaders() as $name => $value) {
@@ -29,7 +34,7 @@ final class CurlHttpClient implements HttpClientInterface
         }
 
         curl_setopt_array($handle, [
-            CURLOPT_CUSTOMREQUEST => $request->getMethod(),
+            CURLOPT_CUSTOMREQUEST => $method,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => $this->timeout,
             CURLOPT_CONNECTTIMEOUT => 10,

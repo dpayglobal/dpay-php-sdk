@@ -217,10 +217,14 @@ final class CardServiceTest extends TestCase
         self::assertTrue($result->isSuccess());
         $request = $this->http->lastRequest();
         self::assertSame('https://api-payments.dpay.pl/api/v1_0/cards/payment/TX-1/capture', $request->getUrl());
-        self::assertSame('{"amount":59.99}', $request->getBody());
+        // sha256(capture|service|transaction_id|amount|hash)
+        self::assertSame(
+            '{"service":"MyShop","amount":59.99,"checksum":"f9f3713764216075a7e1e56a10baa695f802929e70453a0b68146d56d5d3c925"}',
+            $request->getBody()
+        );
     }
 
-    public function testCancelWithoutAmountSendsEmptyObject(): void
+    public function testCancelWithoutAmountSignsAnEmptyAmount(): void
     {
         $this->http->queueJson(200, [
             'success' => true,
@@ -232,7 +236,11 @@ final class CardServiceTest extends TestCase
 
         $request = $this->http->lastRequest();
         self::assertSame('https://api-payments.dpay.pl/api/v1_0/cards/payment/TX-1/cancellation', $request->getUrl());
-        self::assertSame('{}', $request->getBody());
+        // sha256(cancellation|service|transaction_id||hash) - pusty segment kwoty
+        self::assertSame(
+            '{"service":"MyShop","checksum":"adde47e5fce49c92912d41cb34f44b363c6fe426f0c14aa3b5f58a061c7f4c4c"}',
+            $request->getBody()
+        );
     }
 
     public function testCaptureErrorThrows(): void

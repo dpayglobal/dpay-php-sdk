@@ -21,12 +21,17 @@ final class PaymentService
     {
         $service = $this->api->config()->service();
         $body = $request->toBody($service);
-        $body['checksum'] = $this->api->checksum()->secretSecond($service, [
+        $fields = [
             $this->stringField($body, 'value'),
             $this->stringField($body, 'url_success'),
             $this->stringField($body, 'url_fail'),
             $this->stringField($body, 'url_ipn'),
-        ]);
+        ];
+        // A recurring charge binds the checksum to the customer's alias
+        if (isset($body['recurring_alias'])) {
+            $fields[] = $this->stringField($body, 'recurring_alias');
+        }
+        $body['checksum'] = $this->api->checksum()->secretSecond($service, $fields);
 
         $data = $this->api->postJson(BaseUrls::API_PAYMENTS, '/api/v1_0/payments/register', $body);
 

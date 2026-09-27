@@ -11,7 +11,9 @@ use DPay\Http\CurlHttpClient;
 use DPay\Internal\ApiRequestor;
 use DPay\Payment\PaymentService;
 use DPay\Payout\PayoutService;
+use DPay\Recurring\RecurringService;
 use DPay\Refund\RefundService;
+use DPay\Webhook\EventService;
 
 final class DPayClient
 {
@@ -28,6 +30,10 @@ final class DPayClient
     public CardService $cards;
 
     public PayoutService $payouts;
+
+    public RecurringService $recurring;
+
+    public EventService $events;
 
     private Config $config;
 
@@ -46,6 +52,8 @@ final class DPayClient
         $this->blik = new BlikService($api);
         $this->cards = new CardService($api);
         $this->payouts = new PayoutService($api);
+        $this->recurring = new RecurringService($api);
+        $this->events = new EventService($api);
     }
 
     public function getConfig(): Config

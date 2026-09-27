@@ -48,18 +48,4 @@ final class BlikService
 
         $this->api->postJson(BaseUrls::API_PAYMENTS, '/api/v1_0/payments/blik/aliases/unregister', $body);
     }
-
-    public function recurringStatus(string $aliasValue): BlikRecurringStatus
-    {
-        $service = $this->api->config()->service();
-        $body = [
-            'service' => $service,
-            'alias_value' => $aliasValue,
-        ];
-        $body['checksum'] = $this->api->checksum()->secretSecond($service, [$aliasValue]);
-
-        $data = $this->api->postJson(BaseUrls::API_PAYMENTS, '/api/v1_0/payments/blik/recurring/status', $body);
-
-        return BlikRecurringStatus::fromArray(is_array($data['data'] ?? null) ? $data['data'] : []);
-    }
 }

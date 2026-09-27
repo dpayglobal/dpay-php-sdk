@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace DPay\Payment;
 
 use DPay\Blik\BlikAliasRegistration;
-use DPay\Blik\BlikRecurringRegistration;
 use DPay\Card\CardRecurringOperation;
 use DPay\Card\CardRecurringRegistration;
 use DPay\Currency;
 use DPay\Money;
+use DPay\Recurring\RecurringRegistration;
+use DPay\Webhook\WebhookEventType;
+use DPay\Webhook\WebhookTarget;
 use InvalidArgumentException;
 
 final class RegisterPaymentRequest
@@ -58,7 +60,13 @@ final class RegisterPaymentRequest
 
     private ?BlikAliasRegistration $registerBlikAlias = null;
 
-    private ?BlikRecurringRegistration $registerBlikRecurringAlias = null;
+    private ?RecurringRegistration $recurringRegistration = null;
+
+    private ?string $recurringAlias = null;
+
+    private ?WebhookTarget $webhook = null;
+
+    private ?string $reference = null;
 
     private ?string $aliasIpnUrl = null;
 
@@ -223,8 +231,8 @@ final class RegisterPaymentRequest
 
     public function withBlikAlias(string $aliasValue, string $userAgent, string $userIp): self
     {
-        if ($this->blikCode !== null || $this->registerBlikAlias !== null || $this->registerBlikRecurringAlias !== null) {
-            throw new InvalidArgumentException('blik_alias cannot be combined with blik_code or alias registration');
+        if ($this->blikCode !== null || $this->registerBlikAlias !== null || $this->recurringRegistration !== null || $this->recurringAlias !== null) {
+            throw new InvalidArgumentException('blik_alias cannot be combined with blik_code, alias registration or recurring payments');
         }
         $this->blikAlias = $aliasValue;
         $this->userAgent = $userAgent;
@@ -243,12 +251,66 @@ final class RegisterPaymentRequest
         return $this;
     }
 
-    public function withRegisterBlikRecurringAlias(BlikRecurringRegistration $registration): self
+    /**
+     * Registers a recurring payment together with this payment. Requires the customer's BLIK code
+     * (withBlikCode) and transactionType `transfers`; the amount may be 0 (consent only) or an initial fee.
+     */
+    public function withRecurringRegistration(RecurringRegistration $registration): self
     {
-        if ($this->blikAlias !== null) {
-            throw new InvalidArgumentException('register_blik_recurring_alias cannot be combined with blik_alias');
+        $this->recurringRegistration = $registration;
+
+        return $this;
+    }
+
+    /**
+     * Charges a registered recurring payment server-to-server (no BLIK code). transactionType `transfers`,
+     * amount above 0. The alias is appended to the checksum, binding the charge to that customer.
+     */
+    public function withRecurringAlias(string $alias): self
+    {
+        if ($alias === '' || strlen($alias) > 128) {
+            throw new InvalidArgumentException('Recurring alias must be 1-128 characters');
         }
-        $this->registerBlikRecurringAlias = $registration;
+        $this->recurringAlias = $alias;
+
+        return $this;
+    }
+
+    /**
+     * Payer's user agent and IP for a recurring charge (optional there; BLIK code and alias payments set them
+     * in withBlikCode / withBlikAlias).
+     */
+    public function withClientContext(string $userAgent, string $userIp): self
+    {
+        if (filter_var($userIp, FILTER_VALIDATE_IP) === false) {
+            throw new InvalidArgumentException(sprintf('Invalid user IP "%s"', $userIp));
+        }
+        $this->userAgent = $userAgent;
+        $this->userIp = $userIp;
+
+        return $this;
+    }
+
+    /**
+     * Sends this payment's events (and later events of its refunds and recurring payment) also to this URL,
+     * signed with the service's webhook secret. Not part of the checksum.
+     */
+    public function withWebhook(WebhookTarget $webhook): self
+    {
+        $webhook->assertEventsAllowed(WebhookEventType::PAYMENT_REGISTRATION, 'a payment registration');
+        $this->webhook = $webhook;
+
+        return $this;
+    }
+
+    /** Your reference of the payment (max 64 characters), returned as `references.merchant` in webhooks. */
+    public function withReference(string $reference): self
+    {
+        $reference = trim($reference);
+        if ($reference === '' || mb_strlen($reference) > 64 || preg_match('/[\x00-\x1F\x7F]/', $reference) === 1) {
+            throw new InvalidArgumentException('Reference must be 1-64 characters without control characters');
+        }
+        $this->reference = $reference;
 
         return $this;
     }
@@ -370,14 +432,18 @@ final class RegisterPaymentRequest
      */
     public function toBody(string $service): array
     {
+        $this->assertRecurringCombination();
+
         $body = [
             'service' => $service,
             'value' => $this->amount->toDecimal(),
             'transactionType' => $this->transactionType,
             'url_success' => $this->urls->getSuccess(),
             'url_fail' => $this->urls->getFail(),
-            'url_ipn' => $this->urls->getIpn(),
         ];
+        if ($this->urls->getIpn() !== null) {
+            $body['url_ipn'] = $this->urls->getIpn();
+        }
 
         if ($this->description !== null) {
             $body['description'] = $this->description;
@@ -438,8 +504,11 @@ final class RegisterPaymentRequest
         if ($this->registerBlikAlias !== null) {
             $body['register_blik_alias'] = $this->registerBlikAlias->toArray();
         }
-        if ($this->registerBlikRecurringAlias !== null) {
-            $body['register_blik_recurring_alias'] = $this->registerBlikRecurringAlias->toArray();
+        if ($this->recurringRegistration !== null) {
+            $body['recurring_registration'] = $this->recurringRegistration->toArray();
+        }
+        if ($this->recurringAlias !== null) {
+            $body['recurring_alias'] = $this->recurringAlias;
         }
         if ($this->aliasIpnUrl !== null) {
             $body['alias_ipn_url'] = $this->aliasIpnUrl;
@@ -480,7 +549,48 @@ final class RegisterPaymentRequest
         if ($this->invoice !== null) {
             $body['invoice'] = $this->invoice->toArray();
         }
+        if ($this->webhook !== null) {
+            $body['webhook'] = $this->webhook->toArray();
+        }
+        if ($this->reference !== null) {
+            $body['reference'] = $this->reference;
+        }
 
         return $body;
+    }
+
+    private function assertRecurringCombination(): void
+    {
+        if ($this->recurringRegistration === null && $this->recurringAlias === null) {
+            return;
+        }
+        if ($this->recurringRegistration !== null && $this->recurringAlias !== null) {
+            throw new InvalidArgumentException('recurring_registration cannot be combined with recurring_alias');
+        }
+        if ($this->transactionType !== TransactionType::TRANSFERS) {
+            throw new InvalidArgumentException('Recurring payments require transactionType "transfers"');
+        }
+        $conflicts = [
+            'blik_alias' => $this->blikAlias,
+            'register_blik_alias' => $this->registerBlikAlias,
+            'register_card_recurring' => $this->cardRecurring,
+            'card_recurring_alias' => $this->cardRecurringAlias,
+        ];
+        if ($this->recurringRegistration !== null) {
+            $conflicts['channel'] = $this->channel;
+            if ($this->blikCode === null) {
+                throw new InvalidArgumentException('recurring_registration requires the customer\'s BLIK code (withBlikCode)');
+            }
+        } else {
+            $conflicts['blik_code'] = $this->blikCode;
+            if ($this->amount->getMinor() <= 0) {
+                throw new InvalidArgumentException('A recurring charge requires an amount above 0');
+            }
+        }
+        foreach ($conflicts as $field => $value) {
+            if ($value !== null) {
+                throw new InvalidArgumentException(sprintf('%s cannot be combined with a recurring payment', $field));
+            }
+        }
     }
 }
