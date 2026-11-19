@@ -112,7 +112,7 @@ final class RecurringRegistration
     /** Frequency like `1M`, `2W`, `14D`, `1Y` (1-999 days, weeks, months or years). */
     public function withFrequency(string $frequency): self
     {
-        if (preg_match('/^[1-9][0-9]{0,2}[DWMY]$/', $frequency) !== 1) {
+        if (preg_match('/^[1-9][0-9]{0,2}[DWMY]\z/', $frequency) !== 1) {
             throw new InvalidArgumentException(sprintf('Invalid recurring frequency "%s"', $frequency));
         }
         $this->frequency = $frequency;
@@ -237,7 +237,7 @@ final class RecurringRegistration
 
     private function assertDate(string $date): string
     {
-        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) !== 1) {
+        if (preg_match('/^\d{4}-\d{2}-\d{2}\z/', $date) !== 1) {
             throw new InvalidArgumentException(sprintf('Date "%s" must be in YYYY-MM-DD format', $date));
         }
 

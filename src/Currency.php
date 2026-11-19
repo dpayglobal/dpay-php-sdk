@@ -16,7 +16,7 @@ final class Currency
 
     public static function isValid(string $currency): bool
     {
-        return preg_match('/^[A-Z]{3}$/', $currency) === 1;
+        return preg_match('/^[A-Z]{3}\z/', $currency) === 1;
     }
 
     public static function assertValid(string $currency): void

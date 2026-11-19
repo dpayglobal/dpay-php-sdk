@@ -8,6 +8,9 @@ use DPay\Config;
 use DPay\Exception\NotFoundException;
 use DPay\Internal\ApiRequestor;
 use DPay\Money;
+use DPay\Payout\PayoutDetails;
+use DPay\Payout\PayoutListFilters;
+use DPay\Payout\PayoutListItem;
 use DPay\Payout\PayoutService;
 use DPay\Payout\PayoutState;
 use DPay\Payout\PayoutType;
@@ -417,5 +420,77 @@ final class PayoutServiceTest extends TestCase
             self::assertSame($vectors[$name]['body'], $body, $name);
             self::assertSame($vectors[$name]['checksum'], $checksum, $name);
         }
+    }
+
+    public function testDateFiltersAreTrimmedOfUnicodeWhitespaceAndInvisibleCharacters(): void
+    {
+        $this->http->queueJson(200, ['withdraws' => [], 'meta' => ['page' => 1, 'per_page' => 50, 'total' => 0, 'total_pages' => 0]]);
+
+        $this->service->list(['date_from' => "\u{FEFF}2026-08-01\u{00A0}", 'date_to' => "\u{3000}2026-08-31 23:59:59\u{200B}"]);
+
+        $body = $this->http->lastRequestBody();
+        self::assertSame('2026-08-01', $body['date_from']);
+        self::assertSame('2026-08-31 23:59:59', $body['date_to']);
+        self::assertSame(hash('sha256', 'MyShop|2026-08-01|2026-08-31 23:59:59|secret123'), $body['checksum']);
+    }
+
+    /**
+     * @dataProvider wronglyTypedFilters
+     *
+     * @param array<string, mixed> $filters
+     */
+    public function testWronglyTypedFiltersOfListThrowInvalidArgument(array $filters, string $message): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage($message);
+        PayoutListFilters::toBody($filters);
+    }
+
+    /**
+     * @return array<string, array{array<string, mixed>, string}>
+     */
+    public static function wronglyTypedFilters(): array
+    {
+        return [
+            'date_from int' => [['date_from' => 20260801], 'date_from must be a string'],
+            'date_to DateTime' => [['date_to' => new \DateTimeImmutable('2026-08-31')], 'date_to must be a string'],
+            'state numeric string' => [['state' => '1'], 'state must be an integer'],
+            'state bool' => [['state' => true], 'state must be an integer'],
+            'type int' => [['type' => 1], 'type must be a string'],
+            'blank date' => [['date_from' => "\u{00A0}\n"], 'date_from must not be empty'],
+        ];
+    }
+
+    /**
+     * @dataProvider payoutFlags
+     *
+     * @param mixed $value
+     */
+    public function testPayoutFlagsAreTrueOnlyForTheJsonInteger1($value, bool $expected): void
+    {
+        $details = PayoutDetails::fromArray(['id' => 1, 'paysafecard' => $value, 'direct_settlement' => $value, 'declined' => $value]);
+        $item = PayoutListItem::fromArray(['id' => 1, 'declined' => $value]);
+
+        self::assertSame($expected, $details->isPaysafecard());
+        self::assertSame($expected, $details->isDirectSettlement());
+        self::assertSame($expected, $details->isDeclined());
+        self::assertSame($expected, $item->isDeclined());
+    }
+
+    /**
+     * @return array<string, array{mixed, bool}>
+     */
+    public static function payoutFlags(): array
+    {
+        return [
+            'integer 1' => [1, true],
+            'integer 0' => [0, false],
+            'string 1' => ['1', false],
+            'string 1abc' => ['1abc', false],
+            'true' => [true, false],
+            'float 1.0' => [1.0, false],
+            'integer 2' => [2, false],
+            'null' => [null, false],
+        ];
     }
 }

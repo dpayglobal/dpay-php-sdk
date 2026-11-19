@@ -219,6 +219,6 @@ final class Transaction
     {
         $value = $this->transaction()[$key] ?? null;
 
-        return is_int($value) || (is_string($value) && preg_match('/^-?\d+$/', $value) === 1) ? (int) $value : null;
+        return is_int($value) || (is_string($value) && preg_match('/^-?\d+\z/', $value) === 1) ? (int) $value : null;
     }
 }

@@ -6,6 +6,7 @@ namespace DPay\Refund;
 
 use DPay\Internal\ApiRequestor;
 use DPay\Internal\BaseUrls;
+use DPay\Internal\ServerTrim;
 use DPay\Money;
 use DPay\Webhook\WebhookEventType;
 use DPay\Webhook\WebhookTarget;
@@ -26,7 +27,9 @@ final class RefundService
     /**
      * Orders a refund (partial with an amount, the rest of the payment without). A 200 response means the refund
      * was accepted - its outcome comes as a `refund.succeeded` / `refund.failed` event. The optional webhook target
-     * receives the events of this refund and is part of the checksum.
+     * receives the events of this refund and is part of the checksum. The transaction ID, reason and webhook URL are
+     * sent and signed trimmed, as the API trims them before it verifies the checksum (ServerTrim); a reason that is
+     * blank after trimming is sent as "".
      *
      * @param string|null $messageId your own refund identifier, sent in the `DigitalPayments-PSP-Message-ID` header
      *                               (not part of the checksum): the refund transfer title becomes
@@ -45,7 +48,7 @@ final class RefundService
         }
         $headers = [];
         if ($messageId !== null) {
-            if (preg_match('/^[\x20-\x7E]+$/', $messageId) !== 1 || trim($messageId) === '') {
+            if (preg_match('/^[\x20-\x7E]+\z/', $messageId) !== 1 || trim($messageId) === '') {
                 throw new InvalidArgumentException('Refund message ID must be non-empty printable ASCII');
             }
             $headers[self::MESSAGE_ID_HEADER] = $messageId;
@@ -58,10 +61,12 @@ final class RefundService
     }
 
     /**
-     * Checks whether the refund is possible. Every answer that carries the `refund` key - HTTP 200 and the business
-     * refusals 400, 402, 404 (transaction does not exist), 406, 409, 410, 411, 423 and a business 401 - is returned as
-     * RefundAvailability (getHttpStatus() tells the reason apart). An invalid checksum (401 "Unauthorized request"),
-     * validation errors (422), rate limits and server errors throw.
+     * Checks whether the refund is possible. The answer is decided by the body, not by a list of statuses: HTTP 200
+     * and every 4xx whose JSON body carries the `refund` key are returned as RefundAvailability (getHttpStatus()
+     * tells the reason apart) - today the business refusals 400, 402, 404 (transaction does not exist), 406, 409, 410,
+     * 411, 423 and a business 401. Thrown: 401 "Unauthorized request" (invalid checksum), every response without the
+     * `refund` key - which is how the API answers validation errors (422) and rate limits (429) - and every 5xx,
+     * even with the `refund` key.
      */
     public function checkAvailability(string $transactionId, ?Money $amount = null, ?string $reason = null): RefundAvailability
     {
@@ -96,20 +101,20 @@ final class RefundService
     private function signedBody(string $transactionId, ?Money $amount, ?string $reason, ?WebhookTarget $webhook = null): array
     {
         $body = [
-            'service' => $this->api->config()->service(),
-            'transaction_id' => $transactionId,
+            'service' => $this->api->panelService(),
+            'transaction_id' => ServerTrim::required($transactionId, 'transaction_id'),
         ];
         if ($amount !== null) {
             $body['value'] = $amount->toDecimal();
         }
         if ($reason !== null) {
+            // Blank after trimming is sent as "" - the API turns it into null and hashes an empty segment
             $body['reason'] = $reason;
         }
         if ($webhook !== null) {
             $body['webhook'] = $webhook->toArray();
         }
-        $body['checksum'] = $this->api->checksum()->orderedBody($body);
 
-        return $body;
+        return $this->api->signPanelBody($body);
     }
 }

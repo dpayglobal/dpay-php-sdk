@@ -33,7 +33,7 @@ final class Money
     public static function fromDecimal(string $decimal, string $currency): self
     {
         Currency::assertValid($currency);
-        if (preg_match('/^(-?)(\d+)(?:\.(\d{1,2}))?$/', $decimal, $matches) !== 1) {
+        if (preg_match('/^(-?)(\d+)(?:\.(\d{1,2}))?\z/', $decimal, $matches) !== 1) {
             throw new InvalidArgumentException(sprintf('Invalid money amount "%s"', $decimal));
         }
         $fraction = str_pad($matches[3] ?? '', 2, '0');
@@ -73,7 +73,7 @@ final class Money
             return new self((int) round($value * 100), $currency);
         }
         if (is_string($value)) {
-            if (preg_match('/^(-?)(\d+)(?:\.(\d{1,2}))?$/', $value, $matches) !== 1) {
+            if (preg_match('/^(-?)(\d+)(?:\.(\d{1,2}))?\z/', $value, $matches) !== 1) {
                 return null;
             }
             $fraction = str_pad($matches[3] ?? '', 2, '0');

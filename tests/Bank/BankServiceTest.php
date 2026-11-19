@@ -69,4 +69,25 @@ final class BankServiceTest extends TestCase
         $body = $this->http->lastRequestBody();
         self::assertEqualsWithDelta(time(), $body['timestamp'], 5);
     }
+
+    public function testForServiceSendsTheServiceTrimmed(): void
+    {
+        $this->http->queueJson(200, []);
+        $config = Config::fromArray(['service' => " MyShop\u{FEFF}", 'secret_hash' => 'secret123']);
+
+        (new BankService(new ApiRequestor($config, $this->http)))->forService(1753100000);
+
+        $body = $this->http->lastRequestBody();
+        self::assertSame('MyShop', $body['service']);
+        self::assertSame('189d0301f163fb105c9f3d607e8fe0adbbfc5ecd8e16271a682d672f43ab623c', $body['checksum']);
+    }
+
+    public function testForServiceRejectsAServiceBlankAfterTrimming(): void
+    {
+        $config = Config::fromArray(['service' => "\u{3000}", 'secret_hash' => 'secret123']);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('service must not be empty');
+        (new BankService(new ApiRequestor($config, $this->http)))->forService(1753100000);
+    }
 }

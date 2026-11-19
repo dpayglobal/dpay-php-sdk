@@ -56,7 +56,7 @@ final class WebhookVerifier
         if ($id === null || $timestamp === null || $signatureHeader === null) {
             throw new SignatureVerificationException('Missing webhook-id, webhook-timestamp or webhook-signature header');
         }
-        if (preg_match('/^\d+$/', $timestamp) !== 1) {
+        if (preg_match('/^\d+\z/', $timestamp) !== 1) {
             throw new SignatureVerificationException('Invalid webhook-timestamp header');
         }
         if (abs(($now ?? time()) - (int) $timestamp) > $toleranceSeconds) {

@@ -109,7 +109,7 @@ final class CardRecurringRegistration
 
     private function assertDate(string $date): string
     {
-        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) !== 1) {
+        if (preg_match('/^\d{4}-\d{2}-\d{2}\z/', $date) !== 1) {
             throw new InvalidArgumentException(sprintf('Date "%s" must be in YYYY-MM-DD format', $date));
         }
 

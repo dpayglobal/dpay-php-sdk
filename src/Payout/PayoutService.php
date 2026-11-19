@@ -11,12 +11,11 @@ use InvalidArgumentException;
 
 /**
  * Payouts (withdrawals) of your account. Every endpoint signs the body in the order it is sent:
- * sha256(value1|value2|...|SecretHash) - optional fields are sent only when set.
+ * sha256(value1|value2|...|SecretHash) - optional fields are sent only when set, strings trimmed like the API trims
+ * them (ServerTrim).
  */
 final class PayoutService
 {
-    private const LIST_FILTERS = ['date_from', 'date_to', 'state', 'type'];
-
     private ApiRequestor $api;
 
     public function __construct(ApiRequestor $api)
@@ -26,12 +25,12 @@ final class PayoutService
 
     public function details(int $withdrawId, ?int $timestamp = null): PayoutDetails
     {
-        $body = ['service' => $this->api->config()->service()];
+        $body = ['service' => $this->api->panelService()];
         if ($timestamp !== null) {
             $body['timestamp'] = $timestamp;
         }
         $body['withdraw_id'] = $withdrawId;
-        $body['checksum'] = $this->api->checksum()->orderedBody(array_values($body));
+        $body = $this->api->signPanelBody($body);
 
         $data = $this->api->postJson(BaseUrls::PANEL, '/api/v1/pbl/withdraws/details', $body);
 
@@ -42,36 +41,17 @@ final class PayoutService
      * Your payouts, newest first - the source of `withdraw_id`.
      *
      * @param array{date_from?: string, date_to?: string, state?: int, type?: string} $filters creation date range
-     *        (any date or date-time, e.g. `2026-07-01`, `2026-07-31 23:59:59`; sent trimmed), PayoutState, PayoutType
+     *        (strings: any date or date-time, e.g. `2026-07-01`, `2026-07-31 23:59:59`; sent trimmed like every
+     *        string of a panel request), PayoutState (int), PayoutType (string) - a value of another type throws
+     *        InvalidArgumentException
      * @param int|null $perPage 1-200 (API default 50)
      */
     public function list(array $filters = [], ?int $page = null, ?int $perPage = null): PayoutPage
     {
-        $body = ['service' => $this->api->config()->service()];
-        $unknown = array_diff(array_keys($filters), self::LIST_FILTERS);
-        if ($unknown !== []) {
-            throw new InvalidArgumentException(sprintf('Unknown payout filter "%s"', implode('", "', $unknown)));
-        }
-        foreach (['date_from', 'date_to'] as $dateField) {
-            if (isset($filters[$dateField])) {
-                // The API trims strings before it verifies the checksum - an untrimmed value would fail with 401
-                $date = trim($filters[$dateField]);
-                if ($date === '') {
-                    throw new InvalidArgumentException(sprintf('%s must not be empty', $dateField));
-                }
-                $body[$dateField] = $date;
-            }
-        }
-        if (isset($filters['state'])) {
-            PayoutState::assertValid($filters['state']);
-            $body['state'] = $filters['state'];
-        }
-        if (isset($filters['type'])) {
-            PayoutType::assertValid($filters['type']);
-            $body['type'] = $filters['type'];
-        }
+        $body = ['service' => $this->api->panelService()];
+        $body += PayoutListFilters::toBody($filters);
         $this->addPage($body, $page, $perPage, 200);
-        $body['checksum'] = $this->api->checksum()->orderedBody($body);
+        $body = $this->api->signPanelBody($body);
 
         return PayoutPage::fromArray($this->api->postJson(BaseUrls::PANEL, '/api/v1/pbl/withdraws', $body));
     }
@@ -102,11 +82,11 @@ final class PayoutService
     public function detailsFull(int $withdrawId, ?int $page = null, ?int $perPage = null): PayoutSettlement
     {
         $body = [
-            'service' => $this->api->config()->service(),
+            'service' => $this->api->panelService(),
             'withdraw_id' => $withdrawId,
         ];
         $this->addPage($body, $page, $perPage, 500);
-        $body['checksum'] = $this->api->checksum()->orderedBody($body);
+        $body = $this->api->signPanelBody($body);
 
         return PayoutSettlement::fromArray($this->api->postJson(BaseUrls::PANEL, '/api/v1/pbl/withdraws/details/full', $body));
     }

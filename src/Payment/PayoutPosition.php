@@ -41,7 +41,7 @@ final class PayoutPosition
     public static function isValidPolishIban(string $iban): bool
     {
         $normalized = strtoupper((string) preg_replace('/\s/', '', $iban));
-        if (preg_match('/^PL\d{26}$/', $normalized) !== 1) {
+        if (preg_match('/^PL\d{26}\z/', $normalized) !== 1) {
             return false;
         }
         // Country code and check digits go to the end, letters become numbers (P = 25, L = 21)

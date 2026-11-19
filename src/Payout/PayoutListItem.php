@@ -99,9 +99,10 @@ final class PayoutListItem
         return $this->string('export_date');
     }
 
+    /** `declined` is the JSON integer 1. */
     public function isDeclined(): bool
     {
-        return $this->int('declined') === 1;
+        return ($this->raw['declined'] ?? null) === 1;
     }
 
     /**

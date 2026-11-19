@@ -59,13 +59,10 @@ final class PayoutDetails
         $this->creationDate = isset($raw['creation_date']) && is_string($raw['creation_date'])
             ? $raw['creation_date']
             : null;
-        $this->directSettlement = isset($raw['direct_settlement']) && is_scalar($raw['direct_settlement'])
-            ? (int) $raw['direct_settlement'] === 1
-            : false;
+        // The API sends its 0/1 flags as JSON integers - only the integer 1 is true
+        $this->directSettlement = ($raw['direct_settlement'] ?? null) === 1;
         $this->nrb = isset($raw['nrb']) && is_string($raw['nrb']) ? $raw['nrb'] : null;
-        $this->declined = isset($raw['declined']) && is_scalar($raw['declined'])
-            ? (int) $raw['declined'] === 1
-            : false;
+        $this->declined = ($raw['declined'] ?? null) === 1;
         $this->declineReason = isset($raw['decline_reason']) && is_string($raw['decline_reason'])
             ? $raw['decline_reason']
             : null;
@@ -142,12 +139,10 @@ final class PayoutDetails
         return is_string($exportDate) ? $exportDate : null;
     }
 
-    /** Paysafecard payout (`paysafecard` = 1, present only for regular, non-direct settlements). */
+    /** Paysafecard payout (`paysafecard` is the JSON integer 1; sent only for regular, non-direct settlements). */
     public function isPaysafecard(): bool
     {
-        $paysafecard = $this->raw['paysafecard'] ?? null;
-
-        return is_scalar($paysafecard) && (int) $paysafecard === 1;
+        return ($this->raw['paysafecard'] ?? null) === 1;
     }
 
     public function isDirectSettlement(): bool

@@ -7,6 +7,7 @@ namespace DPay\Payment;
 use DPay\Exception\PaymentRejectedException;
 use DPay\Internal\ApiRequestor;
 use DPay\Internal\BaseUrls;
+use DPay\Internal\ServerTrim;
 
 final class PaymentService
 {
@@ -44,12 +45,10 @@ final class PaymentService
 
     public function details(string $transactionId): Transaction
     {
-        $service = $this->api->config()->service();
-        $body = [
-            'service' => $service,
-            'transaction_id' => $transactionId,
-        ];
-        $body['checksum'] = $this->api->checksum()->orderedBody(array_values($body));
+        $body = $this->api->signPanelBody([
+            'service' => $this->api->panelService(),
+            'transaction_id' => ServerTrim::required($transactionId, 'transaction_id'),
+        ]);
 
         $data = $this->api->postJson(BaseUrls::PANEL, '/api/v1/pbl/details', $body);
 

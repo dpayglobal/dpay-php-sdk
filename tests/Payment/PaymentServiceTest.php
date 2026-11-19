@@ -213,4 +213,22 @@ final class PaymentServiceTest extends TestCase
             $body['checksum']
         );
     }
+
+    public function testDetailsSendsTheTransactionIdTrimmedLikeTheApiTrimsIt(): void
+    {
+        $this->http->queueJson(200, ['status' => 'success', 'transaction' => ['id' => 'X'], 'payer' => [], 'refunds' => []]);
+
+        $this->service->details("\t30D9493D-1D73-3FBD-A5D4-633723CC7A68\u{2028}");
+
+        $body = $this->http->lastRequestBody();
+        self::assertSame('30D9493D-1D73-3FBD-A5D4-633723CC7A68', $body['transaction_id']);
+        self::assertSame('3b345f55900ae6a43220dd14a3827ed9a26a02a3eb46b856d302e2baa44b48a4', $body['checksum']);
+    }
+
+    public function testDetailsRejectsABlankTransactionId(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('transaction_id must not be empty');
+        $this->service->details("\u{200B}");
+    }
 }

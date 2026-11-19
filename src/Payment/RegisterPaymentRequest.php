@@ -229,7 +229,7 @@ final class RegisterPaymentRequest
 
     public function withPartnerPlatform(string $partnerPlatform): self
     {
-        if (preg_match('/^[A-Z0-9]{1,64}$/', $partnerPlatform) !== 1) {
+        if (preg_match('/^[A-Z0-9]{1,64}\z/', $partnerPlatform) !== 1) {
             throw new InvalidArgumentException('Partner platform must match ^[A-Z0-9]{1,64}$');
         }
         $this->partnerPlatform = $partnerPlatform;
@@ -239,7 +239,7 @@ final class RegisterPaymentRequest
 
     public function withBlikCode(string $blikCode, string $userAgent, string $userIp): self
     {
-        if (preg_match('/^\d{6}$/', $blikCode) !== 1) {
+        if (preg_match('/^\d{6}\z/', $blikCode) !== 1) {
             throw new InvalidArgumentException('BLIK code must be exactly 6 digits');
         }
         if ($this->blikAlias !== null) {

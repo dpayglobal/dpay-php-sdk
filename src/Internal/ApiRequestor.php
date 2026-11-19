@@ -47,6 +47,30 @@ final class ApiRequestor
     }
 
     /**
+     * Your service name for a panel (`/api/v1/pbl/*`) request body, trimmed like the API trims it (ServerTrim).
+     */
+    public function panelService(): string
+    {
+        return ServerTrim::required($this->config->service(), 'service');
+    }
+
+    /**
+     * A panel (`/api/v1/pbl/*`) body ready to send: every string trimmed the way the API trims it before it verifies
+     * the checksum (ServerTrim), then signed with the ordered-body checksum over the values as sent.
+     *
+     * @param array<string, mixed> $body
+     * @return array<string, mixed>
+     */
+    public function signPanelBody(array $body): array
+    {
+        /** @var array<string, mixed> $trimmed */
+        $trimmed = ServerTrim::trimStrings($body);
+        $trimmed['checksum'] = $this->checksum->orderedBody($trimmed);
+
+        return $trimmed;
+    }
+
+    /**
      * @param array<string, mixed> $body
      * @param array<string, string> $headers extra request headers (e.g. `DigitalPayments-PSP-Message-ID`)
      * @return array<mixed>
@@ -96,7 +120,7 @@ final class ApiRequestor
             'User-Agent' => 'dpay-php-sdk/' . Version::SDK . ' php/' . PHP_VERSION,
         ];
         foreach ($extraHeaders as $name => $value) {
-            if (preg_match('/^[A-Za-z0-9-]+$/', $name) !== 1 || preg_match('/[\x00-\x1F\x7F]/', $value) === 1) {
+            if (preg_match('/^[A-Za-z0-9-]+\z/', $name) !== 1 || preg_match('/[\x00-\x1F\x7F]/', $value) === 1) {
                 throw new InvalidArgumentException(sprintf('Invalid request header "%s"', $name));
             }
             $headers[$name] = $value;
