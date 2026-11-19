@@ -153,6 +153,61 @@
         }
       },
       "checksum": "53620f0ea6b46723866a46f2f0059c79cbe080e59d4f134508546be3fa08dacf"
+    },
+    {
+      "name": "payouts_list_minimal",
+      "body": {
+        "service": "sdk-test-service"
+      },
+      "checksum": "8a106fb497d5eeedd2928d7d8f362e3402f77870270967ab3d51313d1f95dd58"
+    },
+    {
+      "name": "payouts_list_all_filters",
+      "body": {
+        "service": "sdk-test-service",
+        "date_from": "2026-08-01",
+        "date_to": "2026-08-31 23:59:59",
+        "state": 1,
+        "type": "standard",
+        "page": 2,
+        "per_page": 10
+      },
+      "checksum": "c711ce3d6e860db1619910f80fa4dbb7a8114ad296018746cfaaf469b4f8e8a1"
+    },
+    {
+      "name": "payouts_list_state_failed",
+      "body": {
+        "service": "sdk-test-service",
+        "state": -1
+      },
+      "checksum": "c7b569513239054aa2e6ae28d08099e5435e5f5c248cda8d132a3469341ecd5b"
+    },
+    {
+      "name": "payouts_list_state_waiting_page_1",
+      "body": {
+        "service": "sdk-test-service",
+        "state": 0,
+        "page": 1
+      },
+      "checksum": "d3eaa6549a52b4aa0872887b70a4dea2dd7758f39f2cb079caf3bfb49d5bcd6c"
+    },
+    {
+      "name": "payouts_details_full_minimal",
+      "body": {
+        "service": "sdk-test-service",
+        "withdraw_id": 12345
+      },
+      "checksum": "b4b8d4e9faf8a815e9ef2cc4f4e36b78330bb03990ef0b3237f1f164e8e4dbea"
+    },
+    {
+      "name": "payouts_details_full_page",
+      "body": {
+        "service": "sdk-test-service",
+        "withdraw_id": 12345,
+        "page": 2,
+        "per_page": 500
+      },
+      "checksum": "b25ea10f74283dd00e2192fe742bf8273a40c485a8450b3a7750abc5ff8ee00c"
     }
   ],
   "webhook": {

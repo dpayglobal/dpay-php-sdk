@@ -361,4 +361,49 @@ final class PayoutServiceTest extends TestCase
         $this->expectException(NotFoundException::class);
         $this->service->detailsFull(999);
     }
+
+    public function testBodiesMatchTheSharedVectors(): void
+    {
+        $http = new MockHttpClient();
+        $service = new PayoutService(new ApiRequestor(
+            Config::fromArray(['service' => \DPay\Tests\Support\ApiVectors::service(), 'secret_hash' => \DPay\Tests\Support\ApiVectors::secretHash()]),
+            $http
+        ));
+        $vectors = [];
+        foreach (\DPay\Tests\Support\ApiVectors::orderedBody() as $vector) {
+            $vectors[$vector['name']] = $vector;
+        }
+        $empty = ['withdraws' => [], 'meta' => ['page' => 1, 'per_page' => 50, 'total' => 0, 'total_pages' => 0]];
+        $full = ['settlement' => [], 'summary' => [], 'transactions' => [], 'meta' => []];
+
+        $calls = [
+            'payouts_list_minimal' => static function () use ($service): void {
+                $service->list();
+            },
+            'payouts_list_all_filters' => static function () use ($service): void {
+                $service->list(['date_from' => '2026-08-01', 'date_to' => '2026-08-31 23:59:59', 'state' => 1, 'type' => 'standard'], 2, 10);
+            },
+            'payouts_list_state_failed' => static function () use ($service): void {
+                $service->list(['state' => PayoutState::FAILED]);
+            },
+            'payouts_list_state_waiting_page_1' => static function () use ($service): void {
+                $service->list(['state' => PayoutState::WAITING], 1);
+            },
+            'payouts_details_full_minimal' => static function () use ($service): void {
+                $service->detailsFull(12345);
+            },
+            'payouts_details_full_page' => static function () use ($service): void {
+                $service->detailsFull(12345, 2, 500);
+            },
+        ];
+        foreach ($calls as $name => $call) {
+            $http->queueJson(200, strpos($name, 'payouts_list') === 0 ? $empty : $full);
+            $call();
+            $body = $http->lastRequestBody();
+            $checksum = $body['checksum'];
+            unset($body['checksum']);
+            self::assertSame($vectors[$name]['body'], $body, $name);
+            self::assertSame($vectors[$name]['checksum'], $checksum, $name);
+        }
+    }
 }

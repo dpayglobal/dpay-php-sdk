@@ -49,7 +49,8 @@ Wersja dogania dokumentację API dpay (OpenAPI 1.6.0) i działa z obecnym API - 
   z `redirectText` odpowiedzi APPLE_PAY_INIT).
 - `RateLimitException::getReset()` (nagłówek `X-RateLimit-Reset`), `Currency::USD` i `Currency::RON`,
   `DeviceInfo::getBrowserJavaEnabled()`.
-- `tests/Fixtures/api_vectors.json`: wektory IPN transfer, dcb i alias_update.
+- `tests/Fixtures/api_vectors.json`: wektory IPN transfer, dcb i alias_update oraz sum list i szczegółów
+  wypłat.
 
 ### Changed
 
