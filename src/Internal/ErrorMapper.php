@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DPay\Internal;
 
+use DPay\Card\CardError;
 use DPay\Exception\ApiErrorException;
 use DPay\Exception\ApiServerException;
 use DPay\Exception\AuthenticationException;
@@ -37,6 +38,11 @@ final class ErrorMapper
         $reason = isset($data['reason']) && is_string($data['reason']) ? $data['reason'] : null;
 
         $fieldErrors = $this->normalizeFieldErrors($data['errors'] ?? null);
+        // Payments API: the transaction created before the error and the card decline (declined saved-card charge)
+        $transactionId = isset($data['transactionId']) && is_string($data['transactionId']) && $data['transactionId'] !== ''
+            ? $data['transactionId']
+            : null;
+        $cardError = is_array($data['cardError'] ?? null) ? CardError::fromArray($data['cardError']) : null;
 
         if ($status === 429) {
             return new RateLimitException(
@@ -45,23 +51,25 @@ final class ErrorMapper
                 $this->intHeader($response, 'Retry-After'),
                 $this->intHeader($response, 'X-RateLimit-Limit'),
                 $this->intHeader($response, 'X-RateLimit-Remaining'),
-                $rawBody
+                $rawBody,
+                $this->intHeader($response, 'X-RateLimit-Reset')
             );
         }
 
+        $arguments = [$message, $status, $errorCode, $fieldErrors, $rawBody, $reason, $transactionId, $cardError];
         switch (true) {
             case $status === 401:
-                return new AuthenticationException($message, $status, $errorCode, $fieldErrors, $rawBody, $reason);
+                return new AuthenticationException(...$arguments);
             case $status === 403:
-                return new PermissionException($message, $status, $errorCode, $fieldErrors, $rawBody, $reason);
+                return new PermissionException(...$arguments);
             case $status === 404:
-                return new NotFoundException($message, $status, $errorCode, $fieldErrors, $rawBody, $reason);
+                return new NotFoundException(...$arguments);
             case $status === 400 || $status === 422:
-                return new InvalidRequestException($message, $status, $errorCode, $fieldErrors, $rawBody, $reason);
+                return new InvalidRequestException(...$arguments);
             case $status >= 500:
-                return new ApiServerException($message, $status, $errorCode, $fieldErrors, $rawBody, $reason);
+                return new ApiServerException(...$arguments);
             default:
-                return new ApiErrorException($message, $status, $errorCode, $fieldErrors, $rawBody, $reason);
+                return new ApiErrorException(...$arguments);
         }
     }
 

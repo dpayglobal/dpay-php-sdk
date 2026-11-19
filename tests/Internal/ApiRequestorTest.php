@@ -112,4 +112,21 @@ final class ApiRequestorTest extends TestCase
             }
         }
     }
+
+    public function testExtraHeadersAreSent(): void
+    {
+        $this->http->queueJson(200, ['status' => 'success']);
+
+        $this->api->postJson(BaseUrls::PANEL, '/api/v1/pbl/refund', ['service' => 'MyShop'], ['DigitalPayments-PSP-Message-ID' => 'RET-1']);
+
+        $headers = $this->http->lastRequest()->getHeaders();
+        self::assertSame('RET-1', $headers['DigitalPayments-PSP-Message-ID']);
+        self::assertSame('application/json', $headers['Accept']);
+    }
+
+    public function testHeaderInjectionIsRejected(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->api->postJson(BaseUrls::PANEL, '/api/v1/pbl/refund', [], ['X-Test' => "a\r\nX-Other: b"]);
+    }
 }

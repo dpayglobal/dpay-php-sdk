@@ -185,6 +185,29 @@ final class CardServiceTest extends TestCase
             self::assertSame('DCC_OFFER_EXPIRED', $exception->getMessage());
             self::assertSame('DCC_OFFER_EXPIRED', $exception->getErrorCode());
             self::assertSame(200, $exception->getHttpStatus());
+            self::assertNull($exception->getCardError());
+        }
+    }
+
+    public function testDeclineAtHttp200CarriesCardError(): void
+    {
+        $this->http->queueJson(200, [
+            'success' => false,
+            'status' => 'error',
+            'message' => 'Payment declined',
+            'error' => ['code' => 'payment_declined', 'declineCode' => '05', 'declineMessage' => 'Do not honor'],
+        ]);
+
+        try {
+            $this->service->payOtp('TX-1', $this->request());
+            self::fail('Expected CardPaymentException');
+        } catch (CardPaymentException $exception) {
+            self::assertSame('Payment declined', $exception->getErrorCode());
+            $cardError = $exception->getCardError();
+            self::assertNotNull($cardError);
+            self::assertSame('payment_declined', $cardError->getCode());
+            self::assertSame('05', $cardError->getDeclineCode());
+            self::assertSame('Do not honor', $cardError->getDeclineMessage());
         }
     }
 
@@ -314,5 +337,54 @@ final class CardServiceTest extends TestCase
         $body = $this->http->lastRequestBody();
         self::assertSame('APPLE_PAY_INIT', $body['xPayType']);
         self::assertArrayNotHasKey('xPayToken', $body);
+        self::assertArrayNotHasKey('email', $body);
+    }
+
+    public function testApplePayInitReturnsTheMerchantSession(): void
+    {
+        $session = ['epochTimestamp' => 1790503500000, 'merchantSessionIdentifier' => 'SSH-1', 'signature' => 'abc'];
+        $this->http->queueJson(200, [
+            'success' => true,
+            'status' => 'success',
+            'message' => ['redirectType' => 'FORM', 'redirectText' => base64_encode((string) json_encode($session))],
+        ]);
+
+        $result = $this->service->applePay('TX-1', \DPay\Card\ApplePayRequest::init($this->deviceInfo()));
+
+        self::assertSame($session, $result->getApplePayMerchantSession());
+    }
+
+    public function testMerchantSessionIsNullForAThreeDsForm(): void
+    {
+        $this->http->queueJson(200, [
+            'success' => true,
+            'status' => 'success',
+            'message' => ['redirectType' => 'FORM', 'redirectText' => base64_encode('<form method="POST"></form>')],
+        ]);
+
+        $result = $this->service->payOtp('TX-1', $this->request());
+
+        self::assertNull($result->getApplePayMerchantSession());
+        self::assertSame('<form method="POST"></form>', $result->getThreeDsFormHtml());
+    }
+
+    public function testApplePaySendsTheEmail(): void
+    {
+        $this->http->queueJson(200, ['success' => true, 'status' => 'success', 'message' => ['redirectType' => 'SUCCESS']]);
+
+        $this->service->applePay(
+            'TX-1',
+            \DPay\Card\ApplePayRequest::pay('APPLE-TOKEN', $this->deviceInfo())->withEmail('client@example.com')->withChannelId(31)
+        );
+
+        $body = $this->http->lastRequestBody();
+        self::assertSame(['email', 'channelId', 'xPayType', 'xPayToken', 'deviceInfo'], array_keys($body));
+        self::assertSame('client@example.com', $body['email']);
+        self::assertSame('APPLE_PAY', $body['xPayType']);
+    }
+
+    private function deviceInfo(): DeviceInfo
+    {
+        return DeviceInfo::create('text/html', 'pl-PL', 24, 1200, 1920, -60, 'Mozilla/5.0', 'Win32', '10.10,10.10', 'device-1', 'Netscape');
     }
 }

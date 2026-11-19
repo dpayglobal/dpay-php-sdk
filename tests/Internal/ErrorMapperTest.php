@@ -76,6 +76,54 @@ final class ErrorMapperTest extends TestCase
         self::assertSame(30, $exception->getRetryAfter());
         self::assertSame(120, $exception->getLimit());
         self::assertSame(0, $exception->getRemaining());
+        self::assertNull($exception->getReset());
+    }
+
+    public function testMaps429ResetHeader(): void
+    {
+        $response = new ApiResponse(
+            429,
+            ['retry-after' => '12', 'x-ratelimit-limit' => '60', 'x-ratelimit-remaining' => '0', 'x-ratelimit-reset' => '1790503560'],
+            '{"message":"Too Many Attempts."}'
+        );
+        $exception = $this->mapper->map($response);
+        self::assertInstanceOf(RateLimitException::class, $exception);
+        self::assertSame(1790503560, $exception->getReset());
+        self::assertSame(12, $exception->getRetryAfter());
+    }
+
+    public function testRegisterErrorCarriesTransactionIdAndCardError(): void
+    {
+        $body = '{"status":"failed","message":"Card payment declined","errors":{},"transactionId":"A75AEBB4-4B89-4834-AD43-EF442C133769",'
+            . '"cardError":{"code":"payment_declined","declineCode":"51","declineMessage":"Insufficient funds or over credit limit"}}';
+        $exception = $this->mapper->map(new ApiResponse(400, [], $body));
+
+        self::assertInstanceOf(InvalidRequestException::class, $exception);
+        self::assertSame('A75AEBB4-4B89-4834-AD43-EF442C133769', $exception->getTransactionId());
+        $cardError = $exception->getCardError();
+        self::assertNotNull($cardError);
+        self::assertSame('payment_declined', $cardError->getCode());
+        self::assertSame('51', $cardError->getDeclineCode());
+        self::assertSame('Insufficient funds or over credit limit', $cardError->getDeclineMessage());
+    }
+
+    public function testCardErrorKeepsNullFields(): void
+    {
+        $body = '{"status":"failed","message":"Declined","cardError":{"code":"payment_declined","declineCode":null,"declineMessage":null}}';
+        $cardError = $this->mapper->map(new ApiResponse(400, [], $body))->getCardError();
+
+        self::assertNotNull($cardError);
+        self::assertSame('payment_declined', $cardError->getCode());
+        self::assertNull($cardError->getDeclineCode());
+        self::assertNull($cardError->getDeclineMessage());
+    }
+
+    public function testErrorsWithoutTransactionContextHaveNone(): void
+    {
+        $exception = $this->mapper->map(new ApiResponse(400, [], '{"status":"failed","message":"Invalid checksum","errors":{}}'));
+
+        self::assertNull($exception->getTransactionId());
+        self::assertNull($exception->getCardError());
     }
 
     public function testMaps500(): void

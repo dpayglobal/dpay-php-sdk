@@ -16,6 +16,8 @@ final class ApplePayRequest
 
     private ?int $channelId = null;
 
+    private ?string $email = null;
+
     private function __construct(string $xPayType, ?string $token, DeviceInfo $deviceInfo)
     {
         $this->xPayType = $xPayType;
@@ -33,6 +35,14 @@ final class ApplePayRequest
         return new self('APPLE_PAY', $token, $deviceInfo);
     }
 
+    /** Payer's email (sent with the APPLE_PAY call, like for Google Pay). */
+    public function withEmail(string $email): self
+    {
+        $this->email = $email;
+
+        return $this;
+    }
+
     public function withChannelId(int $channelId): self
     {
         $this->channelId = $channelId;
@@ -46,6 +56,9 @@ final class ApplePayRequest
     public function toBody(): array
     {
         $body = [];
+        if ($this->email !== null) {
+            $body['email'] = $this->email;
+        }
         if ($this->channelId !== null) {
             $body['channelId'] = $this->channelId;
         }
