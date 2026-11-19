@@ -39,7 +39,7 @@ final class PaymentService
             throw PaymentRejectedException::fromResponse($data);
         }
 
-        return RegisteredPayment::fromArray($data);
+        return RegisteredPayment::fromArray($data, $request->getAmount()->getCurrency());
     }
 
     public function details(string $transactionId): Transaction

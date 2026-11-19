@@ -69,4 +69,14 @@ final class RecurringRegistrationTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         RecurringRegistration::create('Abonament', RecurringRegistration::MODEL_O, 'not a url');
     }
+
+    public function testLabelIsAtMost35Characters(): void
+    {
+        $label = str_repeat('ż', 35);
+        self::assertSame($label, RecurringRegistration::create($label, RecurringRegistration::MODEL_O, self::TERMS)->toArray()['label']);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Recurring payment label must be 1-35 characters');
+        RecurringRegistration::create(str_repeat('a', 36), RecurringRegistration::MODEL_O, self::TERMS);
+    }
 }

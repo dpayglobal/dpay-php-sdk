@@ -48,8 +48,8 @@ final class RecurringRegistration
 
     private function __construct(string $label, string $model, string $termsUrl)
     {
-        if ($label === '' || mb_strlen($label) > 50) {
-            throw new InvalidArgumentException('Recurring payment label must be 1-50 characters');
+        if ($label === '' || mb_strlen($label) > 35) {
+            throw new InvalidArgumentException('Recurring payment label must be 1-35 characters');
         }
         if (!in_array($model, [self::MODEL_A, self::MODEL_M, self::MODEL_O], true)) {
             throw new InvalidArgumentException(sprintf('Invalid recurring model "%s"', $model));

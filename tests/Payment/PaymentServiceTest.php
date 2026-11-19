@@ -78,6 +78,82 @@ final class PaymentServiceTest extends TestCase
 
         self::assertTrue($payment->isPaid());
         self::assertNull($payment->getRedirectUrl());
+        self::assertNull($payment->getPaidTransaction());
+        self::assertNull($payment->getMultibanco());
+    }
+
+    public function testRegisterPaidReturnsThePaidTransaction(): void
+    {
+        $this->http->queueJson(200, [
+            'error' => false,
+            'msg' => 'Transaction paid',
+            'status' => true,
+            'transactionId' => '30D9493D-1D73-3FBD-A5D4-633723CC7A68',
+            'additionalInfo' => ['transaction' => [
+                'payment_id' => '30D9493D-1D73-3FBD-A5D4-633723CC7A68',
+                'pid' => null,
+                'mtid' => null,
+                'email' => 'client@example.com',
+                'description' => 'Zamowienie #1234',
+                'name' => 'Jan',
+                'surname' => 'Kowalski',
+                'value' => '10.00',
+                'status' => 'paid',
+                'creation_date' => '2026-11-18 10:00:00',
+                'payment_date' => '2026-11-18 10:01:00',
+            ]],
+        ]);
+
+        $transaction = $this->service->register($this->request())->getPaidTransaction();
+
+        self::assertNotNull($transaction);
+        self::assertSame('30D9493D-1D73-3FBD-A5D4-633723CC7A68', $transaction->getPaymentId());
+        self::assertSame(\DPay\Payment\RegisteredTransaction::STATUS_PAID, $transaction->getStatus());
+        self::assertTrue($transaction->isPaid());
+        $value = $transaction->getValue();
+        self::assertNotNull($value);
+        self::assertTrue($value->equals(Money::pln(1000)));
+        self::assertSame('client@example.com', $transaction->getEmail());
+        self::assertSame('Jan', $transaction->getName());
+        self::assertSame('Kowalski', $transaction->getSurname());
+        self::assertNull($transaction->getPid());
+        self::assertSame('2026-11-18 10:01:00', $transaction->getPaymentDate());
+    }
+
+    public function testRegisterMultibancoReturnsTheReference(): void
+    {
+        $this->http->queueJson(200, [
+            'error' => false,
+            'msg' => 'https://secure.dpay.pl/transfer@pay@ABC',
+            'status' => true,
+            'transactionId' => 'ABC',
+            'multibanco' => [
+                'entity' => '12345',
+                'reference' => '123456789',
+                'amount' => '12.50',
+                'currency' => 'EUR',
+                'expires_at' => '2026-11-21T10:00:00+00:00',
+            ],
+        ]);
+
+        $request = RegisterPaymentRequest::create(
+            Money::of(1250, \DPay\Currency::EUR),
+            TransactionType::TRANSFERS,
+            new ReturnUrls('https://shop.example/ok', 'https://shop.example/fail')
+        )->withChannel('390')
+            ->withPayer(\DPay\Payment\Payer::create()->withEmail('client@example.com')->withName('Joao', 'Silva'))
+            ->withAcceptTos(true);
+        $multibanco = $this->service->register($request)->getMultibanco();
+
+        self::assertSame('EUR', $this->http->lastRequestBody()['currency_code']);
+        self::assertNotNull($multibanco);
+        self::assertSame('12345', $multibanco->getEntity());
+        self::assertSame('123456789', $multibanco->getReference());
+        $amount = $multibanco->getAmount();
+        self::assertNotNull($amount);
+        self::assertTrue($amount->equals(Money::of(1250, 'EUR')));
+        self::assertSame('EUR', $multibanco->getCurrency());
+        self::assertSame('2026-11-21T10:00:00+00:00', $multibanco->getExpiresAt());
     }
 
     public function testRegisterRejectionThrows(): void

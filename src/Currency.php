@@ -11,6 +11,8 @@ final class Currency
     public const PLN = 'PLN';
     public const EUR = 'EUR';
     public const CZK = 'CZK';
+    public const USD = 'USD';
+    public const RON = 'RON';
 
     public static function isValid(string $currency): bool
     {
