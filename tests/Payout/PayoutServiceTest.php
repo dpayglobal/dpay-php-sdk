@@ -209,6 +209,18 @@ final class PayoutServiceTest extends TestCase
         self::assertSame(hash('sha256', 'MyShop|-1|secret123'), $this->http->lastRequestBody()['checksum']);
     }
 
+    public function testDateFiltersAreSentTrimmedBecauseTheApiTrimsBeforeTheChecksum(): void
+    {
+        $this->http->queueJson(200, ['withdraws' => [], 'meta' => ['page' => 1, 'per_page' => 50, 'total' => 0, 'total_pages' => 0]]);
+
+        $this->service->list(['date_from' => " 2026-08-01\n", 'date_to' => '2026-08-31 23:59:59 ']);
+
+        $body = $this->http->lastRequestBody();
+        self::assertSame('2026-08-01', $body['date_from']);
+        self::assertSame('2026-08-31 23:59:59', $body['date_to']);
+        self::assertSame(hash('sha256', 'MyShop|2026-08-01|2026-08-31 23:59:59|secret123'), $body['checksum']);
+    }
+
     public function testIterateWalksAllPages(): void
     {
         $row = static fn (int $id): array => ['id' => $id, 'type' => 'direct', 'state' => 0, 'net' => '1.00', 'fee' => '0.00', 'gross' => '1.00', 'currency_code' => 'PLN', 'declined' => 0];

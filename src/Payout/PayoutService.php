@@ -42,7 +42,7 @@ final class PayoutService
      * Your payouts, newest first - the source of `withdraw_id`.
      *
      * @param array{date_from?: string, date_to?: string, state?: int, type?: string} $filters creation date range
-     *        (any date or date-time, e.g. `2026-07-01`, `2026-07-31 23:59:59`), PayoutState, PayoutType
+     *        (any date or date-time, e.g. `2026-07-01`, `2026-07-31 23:59:59`; sent trimmed), PayoutState, PayoutType
      * @param int|null $perPage 1-200 (API default 50)
      */
     public function list(array $filters = [], ?int $page = null, ?int $perPage = null): PayoutPage
@@ -54,10 +54,12 @@ final class PayoutService
         }
         foreach (['date_from', 'date_to'] as $dateField) {
             if (isset($filters[$dateField])) {
-                if (trim($filters[$dateField]) === '') {
+                // The API trims strings before it verifies the checksum - an untrimmed value would fail with 401
+                $date = trim($filters[$dateField]);
+                if ($date === '') {
                     throw new InvalidArgumentException(sprintf('%s must not be empty', $dateField));
                 }
-                $body[$dateField] = $filters[$dateField];
+                $body[$dateField] = $date;
             }
         }
         if (isset($filters['state'])) {
