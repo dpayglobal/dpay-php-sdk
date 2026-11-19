@@ -182,6 +182,44 @@ final class IpnVerifierTest extends TestCase
         IpnVerifier::constructEvent($this->aliasUpdatePayload(['version' => null]), 'secret123');
     }
 
+    public function testAliasUpdateIgnoresUnsignedTransferFields(): void
+    {
+        // amount, email, attempt and custom are not part of the alias_update signature - an injected value
+        // must not reach handlers that read them without checking the type
+        $event = IpnVerifier::constructEvent($this->aliasUpdatePayload([
+            'amount' => '999.00',
+            'email' => 'attacker@example.com',
+            'attempt' => 7,
+            'custom' => 'order-1234',
+        ]), 'secret123');
+
+        self::assertTrue($event->isAliasUpdate());
+        self::assertSame('', $event->getAmount());
+        self::assertNull($event->getEmail());
+        self::assertSame(0, $event->getAttempt());
+        self::assertNull($event->getCustom());
+        self::assertSame('30D9493D-1D73-3FBD-A5D4-633723CC7A68', $event->getId());
+        self::assertSame(1, $event->getVersion());
+    }
+
+    public function testTransferSignatureDoesNotVerifyAsAliasUpdate(): void
+    {
+        $this->expectException(SignatureVerificationException::class);
+        $this->expectExceptionMessage('Invalid IPN signature');
+        IpnVerifier::constructEvent($this->transferPayload(['type' => 'alias_update']), 'secret123');
+    }
+
+    public function testAliasUpdateSignatureDoesNotVerifyAsTransfer(): void
+    {
+        $this->expectException(SignatureVerificationException::class);
+        $this->expectExceptionMessage('Invalid IPN signature');
+        IpnVerifier::constructEvent($this->aliasUpdatePayload([
+            'type' => 'transfer',
+            'amount' => '',
+            'attempt' => 1,
+        ]), 'secret123');
+    }
+
     public function testTransferHasNoAliasUpdate(): void
     {
         $event = IpnVerifier::constructEvent($this->transferPayload(), 'secret123');

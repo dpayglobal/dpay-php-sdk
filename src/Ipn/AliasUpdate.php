@@ -7,6 +7,10 @@ namespace DPay\Ipn;
 /**
  * Payload of an `alias_update` IPN: a BLIK OneClick alias (alias type UID) or a recurring payment (PAYID) changed
  * its status. Sent to `alias_ipn_url` from the registration, or to `url_ipn` without it.
+ *
+ * The signature covers only `id`, `type` and `version` - none of the fields below. Anyone who has seen one
+ * alias_update of a payment can replay it with a different status, so before acting on a change (e.g. stopping a
+ * subscription) confirm the current state with $dpay->recurring->status() or $dpay->blik->alias().
  */
 final class AliasUpdate
 {

@@ -174,7 +174,7 @@ Własny adres zdarzeń jednej płatności: `->withWebhook(WebhookTarget::create(
 
 ## Obsługa IPN
 
-IPN przychodzi tylko wtedy, gdy podasz adres IPN w `ReturnUrls`.
+IPN przychodzi tylko wtedy, gdy podasz adres IPN w `ReturnUrls` (IPN `alias_update` także na `withAliasIpnUrl()`).
 
 dpay.pl uznaje IPN za dostarczony wyłącznie, gdy body odpowiedzi to dokładnie `OK`.
 Kod HTTP nie jest sprawdzany. Zawsze weryfikuj kwotę z własnym zamówieniem.
@@ -206,7 +206,10 @@ try {
 
 IPN `alias_update` (zmiana aliasu BLIK OneClick lub płatności cyklicznej) przychodzi na `withAliasIpnUrl()`,
 a bez niego na adres IPN. Ma inny podpis (`sha256(id . hash . type . version)`) - `constructEvent()` rozpoznaje
-go po `type`.
+go po `type`, więc zawsze sprawdzaj typ (`isTransfer()`) przed oznaczeniem zamówienia jako opłaconego: `getId()`
+to wtedy płatność, która zarejestrowała alias, a `getAmount()` jest puste. Podpis nie obejmuje pól aliasu
+(`getAliasUpdate()`) - przed reakcją na zmianę potwierdź stan przez `$dpay->recurring->status()`
+lub `$dpay->blik->alias()`.
 
 ## Zwroty
 

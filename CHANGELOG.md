@@ -21,6 +21,11 @@ Wersja dogania dokumentację API dpay (OpenAPI 1.6.0) i działa z obecnym API - 
   serwisu). `withCurrencyCode()` i `withPhoneNumber()` rzucają `InvalidArgumentException`, gdy waluta różni się
   od waluty kwoty - dla MB WAY użyj `Money::of($grosze, Currency::EUR)` zamiast `Money::pln()`. Kwota w PLN
   bez jawnego kodu wysyła body jak dotąd (bez `currency_code`).
+- **BREAKING** `IpnVerifier::constructEvent()` przyjmuje IPN `alias_update` (wcześniej rzucał
+  `SignatureVerificationException` "Invalid IPN payload"). Przychodzi on na `url_ipn`, gdy rejestracja nie miała
+  `alias_ipn_url` - obsługa, która oznacza zamówienie jako opłacone bez sprawdzenia `isTransfer()`, potraktowałaby
+  zmianę aliasu (np. `ALIAS_DECLINED`) jak wpłatę. Dla `alias_update` `getAmount()` jest puste, a `getEmail()`,
+  `getCustom()` i `getAttempt()` zwracają null/0 (te pola nie są podpisane).
 
 ### Added
 
