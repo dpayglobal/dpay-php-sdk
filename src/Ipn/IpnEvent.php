@@ -28,12 +28,14 @@ final class IpnEvent
         return new self($payload);
     }
 
+    /** Payment ID - for alias_update the payment that registered the alias. */
     public function getId(): string
     {
         $id = $this->raw['id'] ?? null;
         return isset($id) && is_scalar($id) ? (string) $id : '';
     }
 
+    /** Paid amount as sent (e.g. `10.00`); empty for alias_update. */
     public function getAmount(): string
     {
         $amount = $this->raw['amount'] ?? null;
@@ -66,6 +68,18 @@ final class IpnEvent
     public function isDcb(): bool
     {
         return $this->getType() === IpnType::DCB;
+    }
+
+    /** BLIK OneClick alias or recurring payment status change - details in getAliasUpdate(). */
+    public function isAliasUpdate(): bool
+    {
+        return $this->getType() === IpnType::ALIAS_UPDATE;
+    }
+
+    /** Alias change of an `alias_update` IPN; null for other types. */
+    public function getAliasUpdate(): ?AliasUpdate
+    {
+        return $this->isAliasUpdate() ? AliasUpdate::fromArray($this->raw) : null;
     }
 
     public function getAttempt(): int

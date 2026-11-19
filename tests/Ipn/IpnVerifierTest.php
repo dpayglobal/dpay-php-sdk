@@ -118,4 +118,75 @@ final class IpnVerifierTest extends TestCase
     {
         self::assertSame('OK', IpnEvent::ACK);
     }
+
+    /**
+     * @param array<string, mixed> $overrides
+     */
+    private function aliasUpdatePayload(array $overrides = []): string
+    {
+        $payload = array_merge([
+            'id' => '30D9493D-1D73-3FBD-A5D4-633723CC7A68',
+            'type' => 'alias_update',
+            'change_type' => 'ALIAS_UNREGISTER',
+            'alias_type' => 'UID',
+            'alias_status' => 'UNREGISTERED',
+            'alias_label' => 'Moj sklep',
+            'alias_key' => 'KEY-1',
+            'alias_expire_at' => null,
+            'change_reason_category' => 'USER',
+            'change_reason_message' => 'Unregistered in the banking app',
+            'version' => 1,
+        ], $overrides);
+        $payload['signature'] ??= hash('sha256', '30D9493D-1D73-3FBD-A5D4-633723CC7A68' . 'secret123' . 'alias_update' . '1');
+
+        return (string) json_encode($payload);
+    }
+
+    public function testValidAliasUpdate(): void
+    {
+        $event = IpnVerifier::constructEvent($this->aliasUpdatePayload(), 'secret123');
+
+        self::assertTrue($event->isAliasUpdate());
+        self::assertFalse($event->isTransfer());
+        self::assertSame('', $event->getAmount());
+        $alias = $event->getAliasUpdate();
+        self::assertNotNull($alias);
+        self::assertSame(\DPay\Ipn\AliasUpdate::CHANGE_UNREGISTER, $alias->getChangeType());
+        self::assertSame(\DPay\Ipn\AliasUpdate::ALIAS_TYPE_UID, $alias->getAliasType());
+        self::assertSame(\DPay\Ipn\AliasUpdate::STATUS_UNREGISTERED, $alias->getAliasStatus());
+        self::assertFalse($alias->isActive());
+        self::assertSame('KEY-1', $alias->getAliasKey());
+        self::assertSame('Moj sklep', $alias->getAliasLabel());
+        self::assertNull($alias->getAliasExpireAt());
+        self::assertSame('USER', $alias->getChangeReasonCategory());
+        self::assertSame('Unregistered in the banking app', $alias->getChangeReasonMessage());
+    }
+
+    public function testAliasUpdateSignatureIgnoresTheAliasFields(): void
+    {
+        // The signature covers only id, type and version - a changed status still verifies, a changed id does not
+        $event = IpnVerifier::constructEvent($this->aliasUpdatePayload(['alias_status' => 'ACTIVE']), 'secret123');
+        self::assertNotNull($event->getAliasUpdate());
+
+        $this->expectException(SignatureVerificationException::class);
+        IpnVerifier::constructEvent($this->aliasUpdatePayload([
+            'id' => 'OTHER',
+            'signature' => hash('sha256', '30D9493D-1D73-3FBD-A5D4-633723CC7A68secret123alias_update1'),
+        ]), 'secret123');
+    }
+
+    public function testAliasUpdateWithoutVersionIsInvalid(): void
+    {
+        $this->expectException(SignatureVerificationException::class);
+        $this->expectExceptionMessage('Invalid IPN payload');
+        IpnVerifier::constructEvent($this->aliasUpdatePayload(['version' => null]), 'secret123');
+    }
+
+    public function testTransferHasNoAliasUpdate(): void
+    {
+        $event = IpnVerifier::constructEvent($this->transferPayload(), 'secret123');
+
+        self::assertFalse($event->isAliasUpdate());
+        self::assertNull($event->getAliasUpdate());
+    }
 }

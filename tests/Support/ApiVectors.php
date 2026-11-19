@@ -79,6 +79,29 @@ final class ApiVectors
     }
 
     /**
+     * IPN payloads as dpay sends them (`signature` included), signed with secret_hash.
+     *
+     * @return list<array{name: string, body: string, payload: array<mixed>}>
+     */
+    public static function ipn(): array
+    {
+        $vectors = [];
+        foreach (self::list(self::data(), 'ipn') as $vector) {
+            $payload = $vector['payload'] ?? null;
+            if (!is_array($payload)) {
+                throw new UnexpectedValueException('ipn.payload must be an object');
+            }
+            $body = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            if ($body === false) {
+                throw new UnexpectedValueException('ipn.payload cannot be encoded');
+            }
+            $vectors[] = ['name' => self::string($vector, 'name'), 'body' => $body, 'payload' => $payload];
+        }
+
+        return $vectors;
+    }
+
+    /**
      * @return array{secret: string, old_secret: string, id: string, timestamp: int, body: string, signature: string, rotation_signature: string}
      */
     public static function webhook(): array

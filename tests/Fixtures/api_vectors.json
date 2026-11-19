@@ -1,5 +1,5 @@
 {
-  "_comment": "Wspólne wektory testowe SDK dpay 0.2.0 - dane syntetyczne (to nie są klucze dpay). Źródło: kod managera 28.09.2026.",
+  "_comment": "Wspólne wektory testowe SDK dpay 0.3.0 - dane syntetyczne (to nie są klucze dpay). Źródło: kod managera 28.09.2026 i 18.11.2026 (IPN alias_update).",
   "service": "sdk-test-service",
   "secret_hash": "sdk-test-hash-0001",
   "transaction_id": "A75AEBB4-4B89-4834-AD43-EF442C133769",
@@ -163,5 +163,49 @@
     "body": "{\"id\":\"evt_01k6a8q2m4pz7h8c3v5n9t2x6y\",\"type\":\"payment.succeeded\",\"data\":{\"object\":{\"object\":\"payment\",\"id\":\"A75AEBB4-4B89-4834-AD43-EF442C133769\",\"amount\":1000}}}",
     "signature": "v1,c+mTZVkrtVb4PwbraXxqRxriIZK/jhSz7mRwwA8pX+U=",
     "rotation_signature": "v1,c+mTZVkrtVb4PwbraXxqRxriIZK/jhSz7mRwwA8pX+U= v1,azvHQTzH+V7t5BuBZJWigdCAExALzrYn6bdMHpPdP9g="
-  }
+  },
+  "ipn": [
+    {
+      "name": "transfer",
+      "payload": {
+        "id": "A75AEBB4-4B89-4834-AD43-EF442C133769",
+        "amount": "10.00",
+        "email": "client@example.com",
+        "type": "transfer",
+        "attempt": 1,
+        "version": 1,
+        "custom": "order-1234",
+        "signature": "7fb702798b8539847450c13d53b3ecb225670210a66e4568e59bf3073eebfdbc"
+      }
+    },
+    {
+      "name": "dcb_without_email",
+      "payload": {
+        "id": "A75AEBB4-4B89-4834-AD43-EF442C133769",
+        "amount": "10.00",
+        "type": "dcb",
+        "attempt": 1,
+        "version": 1,
+        "custom": "order-1234",
+        "signature": "ff545e0898ea91cf194d935ec33603853e2f65fde2bdc5b52e8bb38628d05ecc"
+      }
+    },
+    {
+      "name": "alias_update_recurring_register",
+      "payload": {
+        "id": "A75AEBB4-4B89-4834-AD43-EF442C133769",
+        "type": "alias_update",
+        "change_type": "ALIAS_REGISTER",
+        "alias_type": "PAYID",
+        "alias_status": "ACTIVE",
+        "alias_label": "Abonament Premium",
+        "alias_key": "BLIK-ALIAS-KEY-0001",
+        "alias_expire_at": "2027-09-30",
+        "change_reason_category": null,
+        "change_reason_message": null,
+        "version": 1,
+        "signature": "4301bf484b55e69a6ee4825d1af43a7fa9b0d918d8b86cbac7f1e322d42724b6"
+      }
+    }
+  ]
 }
