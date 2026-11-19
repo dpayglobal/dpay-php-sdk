@@ -144,10 +144,11 @@ final class RegisterPaymentRequest
     /**
      * Direct payment channel (bank or method ID, e.g. `373` for MB WAY), skipping the dpay gateway. A channel requires
      * the payer's email and name (withPayer) and withAcceptTos(); it cannot be tester, paypal, installment or paysafecard.
+     * An empty string is sent as before 0.3.0 and means no channel (the API turns it into null).
      */
     public function withChannel(string $channel): self
     {
-        if ($channel === '' || in_array($channel, self::FORBIDDEN_CHANNELS, true)) {
+        if (in_array($channel, self::FORBIDDEN_CHANNELS, true)) {
             throw new InvalidArgumentException(sprintf('Channel "%s" cannot be used as a direct payment channel', $channel));
         }
         $this->channel = $channel;
@@ -608,15 +609,16 @@ final class RegisterPaymentRequest
      */
     private function assertDirectChannel(): void
     {
+        $hasChannel = $this->channel !== null && $this->channel !== '';
         if ($this->transactionType === TransactionType::MB_WAY_DIRECT) {
-            if ($this->channel === null) {
+            if (!$hasChannel) {
                 throw new InvalidArgumentException('transactionType "mb_way_direct" requires a channel (withChannel("373"))');
             }
             if ($this->deviceInfo === null || $this->deviceInfo->getBrowserJavaEnabled() === null) {
                 throw new InvalidArgumentException('transactionType "mb_way_direct" requires device info with browserJavaEnabled (withDeviceInfo)');
             }
         }
-        if ($this->channel === null) {
+        if (!$hasChannel) {
             return;
         }
         $payer = $this->payer;
@@ -667,7 +669,7 @@ final class RegisterPaymentRequest
             'card_recurring_alias' => $this->cardRecurringAlias,
         ];
         if ($this->recurringRegistration !== null) {
-            $conflicts['channel'] = $this->channel;
+            $conflicts['channel'] = $this->channel === '' ? null : $this->channel;
             if ($this->blikCode === null) {
                 throw new InvalidArgumentException('recurring_registration requires the customer\'s BLIK code (withBlikCode)');
             }

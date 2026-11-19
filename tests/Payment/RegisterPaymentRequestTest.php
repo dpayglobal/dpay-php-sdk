@@ -232,7 +232,25 @@ final class RegisterPaymentRequestTest extends TestCase
      */
     public static function forbiddenChannels(): array
     {
-        return ['tester' => ['tester'], 'paypal' => ['paypal'], 'installment' => ['installment'], 'paysafecard' => ['paysafecard'], 'empty' => ['']];
+        return ['tester' => ['tester'], 'paypal' => ['paypal'], 'installment' => ['installment'], 'paysafecard' => ['paysafecard']];
+    }
+
+    public function testEmptyChannelMeansNoDirectChannel(): void
+    {
+        // The API turns "" into null (ConvertEmptyStringsToNull), so it needs no payer or terms - sent as in 0.2.0
+        $body = RegisterPaymentRequest::create(Money::pln(1000), TransactionType::TRANSFERS, $this->urls())
+            ->withChannel('')
+            ->toBody('MyShop');
+        self::assertSame('', $body['channel']);
+
+        $request = RegisterPaymentRequest::create(Money::of(500, Currency::EUR), TransactionType::MB_WAY_DIRECT, $this->urls())
+            ->withChannel('')
+            ->withPayer(Payer::create()->withEmail('client@example.com')->withName('Joao', 'Silva'))
+            ->withAcceptTos(true)
+            ->withDeviceInfo($this->deviceInfo(true));
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('requires a channel');
+        $request->toBody('MyShop');
     }
 
     public function testAliasIpnUrlIsAtMost500Characters(): void
