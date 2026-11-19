@@ -124,4 +124,45 @@ final class TransactionTest extends TestCase
         self::assertSame(0, $transaction->getValue()->getMinor());
         self::assertSame(0, $transaction->getRefundedAmount()->getMinor());
     }
+
+    public function testMapsFeesAndUrls(): void
+    {
+        $transaction = Transaction::fromArray($this->fixture());
+
+        self::assertSame('2', $transaction->getRate());
+        self::assertSame(20, $transaction->getMinimalFee());
+        self::assertSame(0, $transaction->getPermanentFee());
+        $urls = $transaction->getUrls();
+        self::assertNotNull($urls);
+        self::assertSame('https://shop.example/ok', $urls->getSuccess());
+        self::assertSame('https://shop.example/fail', $urls->getFail());
+        self::assertSame('https://shop.example/ipn', $urls->getIpn());
+    }
+
+    public function testFeesFromDatabaseStringsAndMissingIpn(): void
+    {
+        $fixture = $this->fixture();
+        $fixture['transaction']['rate'] = '1.49';
+        $fixture['transaction']['minimal_fee'] = '30';
+        unset($fixture['transaction']['permanent_fee']);
+        $fixture['transaction']['urls'] = ['success' => 'https://shop.example/ok', 'fail' => 'https://shop.example/fail', 'ipn' => null];
+
+        $transaction = Transaction::fromArray($fixture);
+
+        self::assertSame('1.49', $transaction->getRate());
+        self::assertSame(30, $transaction->getMinimalFee());
+        self::assertNull($transaction->getPermanentFee());
+        $urls = $transaction->getUrls();
+        self::assertNotNull($urls);
+        self::assertNull($urls->getIpn());
+    }
+
+    public function testMissingFeesAndUrlsAreNull(): void
+    {
+        $transaction = Transaction::fromArray(['transaction' => ['id' => 'x', 'value' => '1.00', 'status' => 'created']]);
+
+        self::assertNull($transaction->getRate());
+        self::assertNull($transaction->getMinimalFee());
+        self::assertNull($transaction->getUrls());
+    }
 }

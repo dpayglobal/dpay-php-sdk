@@ -12,20 +12,23 @@ final class PayoutReceiver
     /** @var array<mixed> */
     private array $raw;
 
+    private string $currency;
+
     /**
      * @param array<mixed> $raw
      */
-    private function __construct(array $raw)
+    private function __construct(array $raw, string $currency)
     {
         $this->raw = $raw;
+        $this->currency = $currency;
     }
 
     /**
      * @param array<mixed> $data
      */
-    public static function fromArray(array $data): self
+    public static function fromArray(array $data, string $currency = Currency::PLN): self
     {
-        return new self($data);
+        return new self($data, Currency::isValid($currency) ? $currency : Currency::PLN);
     }
 
     public function getNrb(): ?string
@@ -40,7 +43,7 @@ final class PayoutReceiver
 
     public function getAmount(): ?Money
     {
-        return Money::tryFromApiNumber($this->raw['amount'] ?? null, Currency::PLN);
+        return Money::tryFromApiNumber($this->raw['amount'] ?? null, $this->currency);
     }
 
     public function getService(): ?string
