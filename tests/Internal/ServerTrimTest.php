@@ -119,7 +119,8 @@ final class ServerTrimTest extends TestCase
             . '\x{200E}\x{200F}\x{202F}\x{205F}\x{2060}\x{2061}\x{2062}\x{2063}\x{2064}\x{2065}\x{206A}\x{206B}\x{206C}'
             . '\x{206D}\x{206E}\x{206F}\x{3000}\x{2800}\x{3164}\x{FEFF}\x{FFA0}\x{1D159}\x{1D173}\x{1D174}\x{1D175}'
             . '\x{1D176}\x{1D177}\x{1D178}\x{1D179}\x{1D17A}\x{E0020}';
-        $trimDefaultCharacters = " \n\r\t\v\0";
+        // NUL as an escape: a literal null byte in a pattern is rejected before PHP 8.2
+        $trimDefaultCharacters = " \n\r\t\v" . '\x00';
         $whitespace = '[\s' . $invisible . $trimDefaultCharacters . ']';
 
         return preg_replace('~^' . $whitespace . '+|' . $whitespace . '(?<!' . $whitespace . $whitespace . ')' . $whitespace . '*+$~u', '', $value) ?? trim($value);
