@@ -45,7 +45,7 @@ final class EventService
             }
         }
         if (isset($params['starting_after'])) {
-            if (preg_match('/^evt_[0-9a-z]{26}$/', $params['starting_after']) !== 1) {
+            if (preg_match('/^evt_[0-9a-z]{26}\z/', $params['starting_after']) !== 1) {
                 throw new InvalidArgumentException('starting_after must be an event id (evt_...)');
             }
             $body['starting_after'] = $params['starting_after'];

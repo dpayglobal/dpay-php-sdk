@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DPay\Exception;
 
+use DPay\Card\CardError;
 use RuntimeException;
 
 class ApiErrorException extends RuntimeException implements ExceptionInterface
@@ -19,6 +20,10 @@ class ApiErrorException extends RuntimeException implements ExceptionInterface
 
     private ?string $reason;
 
+    private ?string $transactionId;
+
+    private ?CardError $cardError;
+
     /**
      * @param array<string, array<int, string>> $fieldErrors
      */
@@ -28,7 +33,9 @@ class ApiErrorException extends RuntimeException implements ExceptionInterface
         ?string $errorCode = null,
         array $fieldErrors = [],
         string $rawBody = '',
-        ?string $reason = null
+        ?string $reason = null,
+        ?string $transactionId = null,
+        ?CardError $cardError = null
     ) {
         parent::__construct($message);
         $this->httpStatus = $httpStatus;
@@ -36,6 +43,23 @@ class ApiErrorException extends RuntimeException implements ExceptionInterface
         $this->fieldErrors = $fieldErrors;
         $this->rawBody = $rawBody;
         $this->reason = $reason;
+        $this->transactionId = $transactionId;
+        $this->cardError = $cardError;
+    }
+
+    /**
+     * Transaction created before the error, when the API returned one (`transactionId`, e.g. a declined charge on a
+     * saved card or a declined payment) - use it to query the transaction.
+     */
+    public function getTransactionId(): ?string
+    {
+        return $this->transactionId;
+    }
+
+    /** Card decline details (`cardError` of a Payments API error, `error` of a declined card operation). */
+    public function getCardError(): ?CardError
+    {
+        return $this->cardError;
     }
 
     /** Detailed reason next to the code, e.g. `https_required` for WEBHOOK_URL_INVALID. */

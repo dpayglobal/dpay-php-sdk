@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace DPay\Tests\Internal;
 
+use DPay\Exception\SignatureVerificationException;
 use DPay\Internal\ChecksumCalculator;
+use DPay\Internal\ServerTrim;
+use DPay\Ipn\IpnVerifier;
 use DPay\Tests\Support\ApiVectors;
 use PHPUnit\Framework\TestCase;
 
@@ -40,6 +43,44 @@ final class ApiVectorsTest extends TestCase
     {
         foreach (ApiVectors::orderedBody() as $vector) {
             self::assertSame($vector['checksum'], $this->calculator()->orderedBody($vector['body']), $vector['name']);
+        }
+    }
+
+    public function testIpnVectors(): void
+    {
+        $vectors = ApiVectors::ipn();
+        self::assertCount(3, $vectors);
+        foreach ($vectors as $vector) {
+            $event = IpnVerifier::constructEvent($vector['body'], ApiVectors::secretHash());
+            self::assertSame(ApiVectors::transactionId(), $event->getId(), $vector['name']);
+            self::assertSame($vector['payload'], $event->getRaw(), $vector['name']);
+
+            try {
+                IpnVerifier::constructEvent($vector['body'], ApiVectors::secretHash() . 'x');
+                self::fail('A wrong secret must not verify ' . $vector['name']);
+            } catch (SignatureVerificationException $exception) {
+                self::assertSame('Invalid IPN signature', $exception->getMessage());
+            }
+        }
+    }
+
+    public function testServerTrimStringVectors(): void
+    {
+        $vectors = ApiVectors::serverTrimStrings();
+        self::assertCount(8, $vectors);
+        foreach ($vectors as $vector) {
+            self::assertSame($vector['trimmed'], ServerTrim::trim($vector['input']), $vector['name']);
+        }
+    }
+
+    public function testServerTrimBodyVectors(): void
+    {
+        $vectors = ApiVectors::serverTrimBodies();
+        self::assertCount(4, $vectors);
+        foreach ($vectors as $vector) {
+            self::assertSame($vector['body'], ServerTrim::trimStrings($vector['input']), $vector['name']);
+            self::assertSame($vector['checksum'], $this->calculator()->orderedBody($vector['body']), $vector['name']);
+            self::assertNotSame($vector['checksum'], $this->calculator()->orderedBody($vector['input']), $vector['name']);
         }
     }
 

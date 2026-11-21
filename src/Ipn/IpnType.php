@@ -12,11 +12,14 @@ final class IpnType
     /** @deprecated dpay no longer sends capture IPNs - use the `payment.captured` webhook event. */
     public const CAPTURE = 'capture';
     public const DCB = 'dcb';
+    /** BLIK OneClick alias or recurring payment status change, sent to `alias_ipn_url` (or `url_ipn`). */
+    public const ALIAS_UPDATE = 'alias_update';
 
     public const ALL = [
         self::TRANSFER,
         self::CAPTURE,
         self::DCB,
+        self::ALIAS_UPDATE,
     ];
 
     public static function assertValid(string $value): void

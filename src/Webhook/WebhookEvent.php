@@ -6,7 +6,8 @@ namespace DPay\Webhook;
 
 /**
  * Webhook event envelope: {id, type, api_version, created, livemode, service, [merchant_ref], data: {object}}.
- * `data.object` stays an array - payment, refund, recurring_payment or payout, amounts in minor units.
+ * `data.object` is available as an array (getObject()) and as a typed model of its kind: getPayment(), getRefund(),
+ * getRecurringPayment(), getPayout() - amounts in minor units.
  */
 final class WebhookEvent
 {
@@ -84,6 +85,30 @@ final class WebhookEvent
         $object = $this->getObject();
 
         return isset($object['object']) && is_string($object['object']) ? $object['object'] : null;
+    }
+
+    /** The `payment` object of payment.* events; null for other objects. */
+    public function getPayment(): ?PaymentObject
+    {
+        return $this->getObjectType() === 'payment' ? PaymentObject::fromArray($this->getObject()) : null;
+    }
+
+    /** The `refund` object of refund.* events; null for other objects. */
+    public function getRefund(): ?RefundObject
+    {
+        return $this->getObjectType() === 'refund' ? RefundObject::fromArray($this->getObject()) : null;
+    }
+
+    /** The `recurring_payment` object of recurring_payment.* events; null for other objects. */
+    public function getRecurringPayment(): ?RecurringPaymentObject
+    {
+        return $this->getObjectType() === 'recurring_payment' ? RecurringPaymentObject::fromArray($this->getObject()) : null;
+    }
+
+    /** The `payout` object of payout.* events; null for other objects. */
+    public function getPayout(): ?PayoutObject
+    {
+        return $this->getObjectType() === 'payout' ? PayoutObject::fromArray($this->getObject()) : null;
     }
 
     /**

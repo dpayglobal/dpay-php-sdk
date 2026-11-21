@@ -16,6 +16,9 @@ use InvalidArgumentException;
 
 final class RegisterPaymentRequest
 {
+    /** Channels the API refuses as a direct `channel`. */
+    private const FORBIDDEN_CHANNELS = ['tester', 'paypal', 'installment', 'paysafecard'];
+
     private Money $amount;
 
     private string $transactionType;
@@ -138,8 +141,16 @@ final class RegisterPaymentRequest
         return $this;
     }
 
+    /**
+     * Direct payment channel (bank or method ID, e.g. `373` for MB WAY), skipping the dpay gateway. A channel requires
+     * the payer's email and name (withPayer) and withAcceptTos(); it cannot be tester, paypal, installment or paysafecard.
+     * An empty string is sent as before 0.3.0 and means no channel (the API turns it into null).
+     */
     public function withChannel(string $channel): self
     {
+        if (in_array($channel, self::FORBIDDEN_CHANNELS, true)) {
+            throw new InvalidArgumentException(sprintf('Channel "%s" cannot be used as a direct payment channel', $channel));
+        }
         $this->channel = $channel;
 
         return $this;
@@ -187,18 +198,30 @@ final class RegisterPaymentRequest
         return $this;
     }
 
+    /**
+     * Payer's phone (MB WAY `+351...`, 9-15 characters). The currency must be the currency of the amount; since 0.3.0
+     * `currency_code` is taken from the amount anyway (Money::of(500, Currency::EUR)).
+     */
     public function withPhoneNumber(string $phoneNumber, string $currencyCode): self
     {
-        Currency::assertValid($currencyCode);
+        $length = mb_strlen($phoneNumber);
+        if ($length < 9 || $length > 15) {
+            throw new InvalidArgumentException('Phone number must be 9-15 characters');
+        }
+        $this->assertAmountCurrency($currencyCode);
         $this->phoneNumber = $phoneNumber;
         $this->currencyCode = $currencyCode;
 
         return $this;
     }
 
+    /**
+     * Sends `currency_code` explicitly. Optional since 0.3.0: a non-PLN amount sends its currency on its own. The code
+     * must be the currency of the amount.
+     */
     public function withCurrencyCode(string $currencyCode): self
     {
-        Currency::assertValid($currencyCode);
+        $this->assertAmountCurrency($currencyCode);
         $this->currencyCode = $currencyCode;
 
         return $this;
@@ -206,7 +229,7 @@ final class RegisterPaymentRequest
 
     public function withPartnerPlatform(string $partnerPlatform): self
     {
-        if (preg_match('/^[A-Z0-9]{1,64}$/', $partnerPlatform) !== 1) {
+        if (preg_match('/^[A-Z0-9]{1,64}\z/', $partnerPlatform) !== 1) {
             throw new InvalidArgumentException('Partner platform must match ^[A-Z0-9]{1,64}$');
         }
         $this->partnerPlatform = $partnerPlatform;
@@ -216,7 +239,7 @@ final class RegisterPaymentRequest
 
     public function withBlikCode(string $blikCode, string $userAgent, string $userIp): self
     {
-        if (preg_match('/^\d{6}$/', $blikCode) !== 1) {
+        if (preg_match('/^\d{6}\z/', $blikCode) !== 1) {
             throw new InvalidArgumentException('BLIK code must be exactly 6 digits');
         }
         if ($this->blikAlias !== null) {
@@ -315,9 +338,10 @@ final class RegisterPaymentRequest
         return $this;
     }
 
+    /** Address of `alias_update` notifications (BLIK OneClick and recurring payments), max 500 characters. */
     public function withAliasIpnUrl(string $url): self
     {
-        if (filter_var($url, FILTER_VALIDATE_URL) === false) {
+        if (mb_strlen($url) > 500 || filter_var($url, FILTER_VALIDATE_URL) === false) {
             throw new InvalidArgumentException(sprintf('Invalid alias IPN URL "%s"', $url));
         }
         $this->aliasIpnUrl = $url;
@@ -433,6 +457,8 @@ final class RegisterPaymentRequest
     public function toBody(string $service): array
     {
         $this->assertRecurringCombination();
+        $this->assertDirectChannel();
+        $this->assertEfakturaCombination();
 
         $body = [
             'service' => $service,
@@ -483,8 +509,13 @@ final class RegisterPaymentRequest
         if ($this->phoneNumber !== null) {
             $body['phone_number'] = $this->phoneNumber;
         }
-        if ($this->currencyCode !== null) {
-            $body['currency_code'] = $this->currencyCode;
+        $currencyCode = $this->currencyCode;
+        if ($currencyCode === null && $this->amount->getCurrency() !== Currency::PLN) {
+            // The API registers an amount without currency_code in PLN
+            $currencyCode = $this->amount->getCurrency();
+        }
+        if ($currencyCode !== null) {
+            $body['currency_code'] = $currencyCode;
         }
         if ($this->partnerPlatform !== null) {
             $body['partner_platform'] = $this->partnerPlatform;
@@ -559,6 +590,67 @@ final class RegisterPaymentRequest
         return $body;
     }
 
+    private function assertAmountCurrency(string $currencyCode): void
+    {
+        Currency::assertValid($currencyCode);
+        if ($currencyCode !== $this->amount->getCurrency()) {
+            throw new InvalidArgumentException(sprintf(
+                'Currency code "%s" does not match the amount currency "%s" - create the amount with Money::of(..., "%s")',
+                $currencyCode,
+                $this->amount->getCurrency(),
+                $currencyCode
+            ));
+        }
+    }
+
+    /**
+     * MB WAY (mb_way_direct) needs channel `373` and the full device info; any direct channel needs the payer's email,
+     * name and the terms acceptance - otherwise the API answers 422.
+     */
+    private function assertDirectChannel(): void
+    {
+        $hasChannel = $this->channel !== null && $this->channel !== '';
+        if ($this->transactionType === TransactionType::MB_WAY_DIRECT) {
+            if (!$hasChannel) {
+                throw new InvalidArgumentException('transactionType "mb_way_direct" requires a channel (withChannel("373"))');
+            }
+            if ($this->deviceInfo === null || $this->deviceInfo->getBrowserJavaEnabled() === null) {
+                throw new InvalidArgumentException('transactionType "mb_way_direct" requires device info with browserJavaEnabled (withDeviceInfo)');
+            }
+        }
+        if (!$hasChannel) {
+            return;
+        }
+        $payer = $this->payer;
+        if ($payer === null || $payer->getEmail() === null || (string) $payer->getFirstName() === '' || (string) $payer->getLastName() === '') {
+            throw new InvalidArgumentException('A direct channel requires the payer\'s email, first name and last name (withPayer)');
+        }
+        if ($this->acceptTos === null) {
+            throw new InvalidArgumentException('A direct channel requires the terms acceptance (withAcceptTos)');
+        }
+    }
+
+    private function assertEfakturaCombination(): void
+    {
+        if ($this->efaktura === null) {
+            return;
+        }
+        $conflicts = [
+            'blik_code' => $this->blikCode,
+            'blik_alias' => $this->blikAlias,
+            'register_blik_alias' => $this->registerBlikAlias,
+            'recurring_registration' => $this->recurringRegistration,
+            'recurring_alias' => $this->recurringAlias,
+            'register_card_recurring' => $this->cardRecurring,
+            'card_recurring_alias' => $this->cardRecurringAlias,
+        ];
+        foreach ($conflicts as $field => $value) {
+            if ($value !== null) {
+                throw new InvalidArgumentException(sprintf('efaktura cannot be combined with %s', $field));
+            }
+        }
+    }
+
     private function assertRecurringCombination(): void
     {
         if ($this->recurringRegistration === null && $this->recurringAlias === null) {
@@ -577,7 +669,7 @@ final class RegisterPaymentRequest
             'card_recurring_alias' => $this->cardRecurringAlias,
         ];
         if ($this->recurringRegistration !== null) {
-            $conflicts['channel'] = $this->channel;
+            $conflicts['channel'] = $this->channel === '' ? null : $this->channel;
             if ($this->blikCode === null) {
                 throw new InvalidArgumentException('recurring_registration requires the customer\'s BLIK code (withBlikCode)');
             }

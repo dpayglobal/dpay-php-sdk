@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace DPay\Payment;
 
+use DPay\Currency;
+
 final class RegisteredPayment
 {
     /** @var array<mixed> */
     private array $raw;
+
+    private string $currency;
 
     private string $transactionId;
 
@@ -18,9 +22,10 @@ final class RegisteredPayment
     /**
      * @param array<mixed> $raw
      */
-    private function __construct(array $raw, string $transactionId, string $message, ?string $ipksef)
+    private function __construct(array $raw, string $transactionId, string $message, ?string $ipksef, string $currency)
     {
         $this->raw = $raw;
+        $this->currency = $currency;
         $this->transactionId = $transactionId;
         $this->message = $message;
         $this->ipksef = $ipksef;
@@ -28,8 +33,9 @@ final class RegisteredPayment
 
     /**
      * @param array<mixed> $data
+     * @param string $currency currency of the registered amount (for getPaidTransaction())
      */
-    public static function fromArray(array $data): self
+    public static function fromArray(array $data, string $currency = Currency::PLN): self
     {
         $transactionId = $data['transactionId'] ?? null;
         $message = $data['msg'] ?? null;
@@ -38,7 +44,8 @@ final class RegisteredPayment
             $data,
             is_scalar($transactionId) ? (string) $transactionId : '',
             is_scalar($message) ? (string) $message : '',
-            isset($data['ipksef']) && is_string($data['ipksef']) ? $data['ipksef'] : null
+            isset($data['ipksef']) && is_string($data['ipksef']) ? $data['ipksef'] : null,
+            Currency::isValid($currency) ? $currency : Currency::PLN
         );
     }
 
@@ -98,6 +105,23 @@ final class RegisteredPayment
         $methods = $this->recurringRegistration()['methods'] ?? null;
 
         return is_array($methods) ? array_values(array_filter($methods, 'is_string')) : [];
+    }
+
+    /** Multibanco reference to show the payer (registration with the Multibanco channel). */
+    public function getMultibanco(): ?MultibancoReference
+    {
+        $multibanco = $this->raw['multibanco'] ?? null;
+
+        return is_array($multibanco) ? MultibancoReference::fromArray($multibanco) : null;
+    }
+
+    /** The already paid transaction of a "Transaction paid" answer (`additionalInfo.transaction`). */
+    public function getPaidTransaction(): ?RegisteredTransaction
+    {
+        $additional = $this->raw['additionalInfo'] ?? null;
+        $transaction = is_array($additional) ? ($additional['transaction'] ?? null) : null;
+
+        return is_array($transaction) ? RegisteredTransaction::fromArray($transaction, $this->currency) : null;
     }
 
     /**

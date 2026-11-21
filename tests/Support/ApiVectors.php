@@ -79,6 +79,64 @@ final class ApiVectors
     }
 
     /**
+     * IPN payloads as dpay sends them (`signature` included), signed with secret_hash.
+     *
+     * @return list<array{name: string, body: string, payload: array<mixed>}>
+     */
+    public static function ipn(): array
+    {
+        $vectors = [];
+        foreach (self::list(self::data(), 'ipn') as $vector) {
+            $payload = $vector['payload'] ?? null;
+            if (!is_array($payload)) {
+                throw new UnexpectedValueException('ipn.payload must be an object');
+            }
+            $body = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            if ($body === false) {
+                throw new UnexpectedValueException('ipn.payload cannot be encoded');
+            }
+            $vectors[] = ['name' => self::string($vector, 'name'), 'body' => $body, 'payload' => $payload];
+        }
+
+        return $vectors;
+    }
+
+    /**
+     * Strings trimmed the way the panel API trims them (Laravel 13 TrimStrings).
+     *
+     * @return list<array{name: string, input: string, trimmed: string}>
+     */
+    public static function serverTrimStrings(): array
+    {
+        $vectors = [];
+        foreach (self::list(self::serverTrim(), 'strings') as $vector) {
+            $vectors[] = ['name' => self::string($vector, 'name'), 'input' => self::string($vector, 'input'), 'trimmed' => self::string($vector, 'trimmed')];
+        }
+
+        return $vectors;
+    }
+
+    /**
+     * Panel bodies as the caller passes them, as sent (trimmed) and their ordered-body checksum.
+     *
+     * @return list<array{name: string, input: array<mixed>, body: array<mixed>, checksum: string}>
+     */
+    public static function serverTrimBodies(): array
+    {
+        $vectors = [];
+        foreach (self::list(self::serverTrim(), 'bodies') as $vector) {
+            $input = $vector['input'] ?? null;
+            $body = $vector['body'] ?? null;
+            if (!is_array($input) || !is_array($body)) {
+                throw new UnexpectedValueException('server_trim.bodies input and body must be objects');
+            }
+            $vectors[] = ['name' => self::string($vector, 'name'), 'input' => $input, 'body' => $body, 'checksum' => self::string($vector, 'checksum')];
+        }
+
+        return $vectors;
+    }
+
+    /**
      * @return array{secret: string, old_secret: string, id: string, timestamp: int, body: string, signature: string, rotation_signature: string}
      */
     public static function webhook(): array
@@ -97,6 +155,19 @@ final class ApiVectors
             'signature' => self::string($webhook, 'signature'),
             'rotation_signature' => self::string($webhook, 'rotation_signature'),
         ];
+    }
+
+    /**
+     * @return array<mixed>
+     */
+    private static function serverTrim(): array
+    {
+        $serverTrim = self::data()['server_trim'] ?? null;
+        if (!is_array($serverTrim)) {
+            throw new UnexpectedValueException('server_trim must be an object');
+        }
+
+        return $serverTrim;
     }
 
     /**

@@ -51,7 +51,7 @@ final class InvoiceDetails
 
     public function withPaymentDueDate(string $paymentDueDate): self
     {
-        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $paymentDueDate) !== 1) {
+        if (preg_match('/^\d{4}-\d{2}-\d{2}\z/', $paymentDueDate) !== 1) {
             throw new InvalidArgumentException('Payment due date must be in YYYY-MM-DD format');
         }
         $this->paymentDueDate = $paymentDueDate;

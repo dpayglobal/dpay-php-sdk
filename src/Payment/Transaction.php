@@ -105,6 +105,34 @@ final class Transaction
         return $this->status === TransactionStatus::PAID || $this->status === TransactionStatus::CAPTURED;
     }
 
+    /** dpay commission rate in percent as sent (e.g. `1.50`). */
+    public function getRate(): ?string
+    {
+        $rate = $this->transaction()['rate'] ?? null;
+
+        return is_string($rate) || is_int($rate) || is_float($rate) ? (string) $rate : null;
+    }
+
+    /** Minimal commission as sent by the API (`minimal_fee`, e.g. 20 = 0.20 PLN). */
+    public function getMinimalFee(): ?int
+    {
+        return $this->intField('minimal_fee');
+    }
+
+    /** Added fixed commission as sent by the API (`permanent_fee`, cards only). */
+    public function getPermanentFee(): ?int
+    {
+        return $this->intField('permanent_fee');
+    }
+
+    /** Return and IPN addresses of the registration. */
+    public function getUrls(): ?TransactionUrls
+    {
+        $urls = $this->transaction()['urls'] ?? null;
+
+        return is_array($urls) ? TransactionUrls::fromArray($urls) : null;
+    }
+
     public function getPaymentMethod(): ?string
     {
         return $this->paymentMethod;
@@ -177,5 +205,20 @@ final class Transaction
     public function getRaw(): array
     {
         return $this->raw;
+    }
+
+    /**
+     * @return array<mixed>
+     */
+    private function transaction(): array
+    {
+        return is_array($this->raw['transaction'] ?? null) ? $this->raw['transaction'] : [];
+    }
+
+    private function intField(string $key): ?int
+    {
+        $value = $this->transaction()[$key] ?? null;
+
+        return is_int($value) || (is_string($value) && preg_match('/^-?\d+\z/', $value) === 1) ? (int) $value : null;
     }
 }

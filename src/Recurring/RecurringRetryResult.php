@@ -56,6 +56,11 @@ final class RecurringRetryResult
         return $this->getStatus() === self::STATUS_PENDING;
     }
 
+    public function isSuccess(): bool
+    {
+        return $this->getStatus() === self::STATUS_SUCCESS;
+    }
+
     public function isFailed(): bool
     {
         return $this->getStatus() === self::STATUS_FAILED;

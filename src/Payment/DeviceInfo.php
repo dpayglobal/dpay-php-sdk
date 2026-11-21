@@ -99,6 +99,12 @@ final class DeviceInfo
         return $this;
     }
 
+    /** `null` when not set - MB WAY registration requires it. */
+    public function getBrowserJavaEnabled(): ?bool
+    {
+        return $this->browserJavaEnabled;
+    }
+
     /**
      * @return array<string, mixed>
      */

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace DPay\Card;
 
+use stdClass;
+
 final class CardPaymentResult
 {
     /** @var array<mixed> */
@@ -72,6 +74,28 @@ final class CardPaymentResult
         $decoded = base64_decode($this->redirectText, true);
 
         return $decoded === false ? null : $decoded;
+    }
+
+    /**
+     * Apple Pay merchant session from an APPLE_PAY_INIT call: `redirectType` FORM with the Base64-encoded
+     * ApplePayMerchantSession JSON in `redirectText`. Pass it to `completeMerchantValidation()` on the device.
+     * Null when the response does not carry a JSON object (e.g. a 3-D Secure form).
+     *
+     * @return array<mixed>|null
+     */
+    public function getApplePayMerchantSession(): ?array
+    {
+        $decoded = $this->getThreeDsFormHtml();
+        if ($decoded === null) {
+            return null;
+        }
+        // Only a JSON object is a merchant session
+        if (!json_decode($decoded) instanceof stdClass) {
+            return null;
+        }
+        $session = json_decode($decoded, true);
+
+        return is_array($session) ? $session : null;
     }
 
     public function getRedirectUrl(): ?string

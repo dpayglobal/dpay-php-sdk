@@ -28,21 +28,27 @@ final class IpnEvent
         return new self($payload);
     }
 
+    /** Payment ID - for alias_update the payment that registered the alias. */
     public function getId(): string
     {
         $id = $this->raw['id'] ?? null;
         return isset($id) && is_scalar($id) ? (string) $id : '';
     }
 
+    /**
+     * Paid amount as sent (e.g. `10.00`); empty for alias_update - its signature does not cover an amount, so a
+     * value in the payload is ignored.
+     */
     public function getAmount(): string
     {
-        $amount = $this->raw['amount'] ?? null;
+        $amount = $this->isAliasUpdate() ? null : ($this->raw['amount'] ?? null);
         return isset($amount) && is_scalar($amount) ? (string) $amount : '';
     }
 
+    /** Payer's email; null for alias_update (not signed there). */
     public function getEmail(): ?string
     {
-        $email = $this->raw['email'] ?? null;
+        $email = $this->isAliasUpdate() ? null : ($this->raw['email'] ?? null);
         return isset($email) && is_scalar($email) ? (string) $email : null;
     }
 
@@ -68,9 +74,22 @@ final class IpnEvent
         return $this->getType() === IpnType::DCB;
     }
 
+    /** BLIK OneClick alias or recurring payment status change - details in getAliasUpdate(). */
+    public function isAliasUpdate(): bool
+    {
+        return $this->getType() === IpnType::ALIAS_UPDATE;
+    }
+
+    /** Alias change of an `alias_update` IPN; null for other types. */
+    public function getAliasUpdate(): ?AliasUpdate
+    {
+        return $this->isAliasUpdate() ? AliasUpdate::fromArray($this->raw) : null;
+    }
+
+    /** Delivery attempt; 0 for alias_update (not signed there). */
     public function getAttempt(): int
     {
-        $attempt = $this->raw['attempt'] ?? null;
+        $attempt = $this->isAliasUpdate() ? null : ($this->raw['attempt'] ?? null);
         return isset($attempt) && is_numeric($attempt) ? (int) $attempt : 0;
     }
 
@@ -80,9 +99,10 @@ final class IpnEvent
         return isset($version) && is_numeric($version) ? (int) $version : 0;
     }
 
+    /** The `custom` value of the registration; null for alias_update (not signed there). */
     public function getCustom(): ?string
     {
-        $custom = $this->raw['custom'] ?? null;
+        $custom = $this->isAliasUpdate() ? null : ($this->raw['custom'] ?? null);
         return isset($custom) && is_scalar($custom) ? (string) $custom : null;
     }
 

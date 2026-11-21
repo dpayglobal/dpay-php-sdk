@@ -31,11 +31,10 @@ final class BankService
      */
     public function forService(?int $timestamp = null): array
     {
-        $body = [
-            'service' => $this->api->config()->service(),
+        $body = $this->api->signPanelBody([
+            'service' => $this->api->panelService(),
             'timestamp' => $timestamp ?? time(),
-        ];
-        $body['checksum'] = $this->api->checksum()->orderedBody(array_values($body));
+        ]);
 
         $data = $this->api->postJson(BaseUrls::PANEL, '/api/v1/pbl/banks', $body);
 

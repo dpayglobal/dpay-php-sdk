@@ -14,8 +14,8 @@ final class BlikAliasRegistration
 
     public function __construct(string $label, string $type = BlikAliasType::UID)
     {
-        if ($label === '' || mb_strlen($label) > 50) {
-            throw new InvalidArgumentException('Alias label must be 1-50 characters');
+        if ($label === '' || mb_strlen($label) > 35) {
+            throw new InvalidArgumentException('Alias label must be 1-35 characters');
         }
         BlikAliasType::assertValid($type);
         $this->label = $label;

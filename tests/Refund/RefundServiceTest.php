@@ -5,7 +5,11 @@ declare(strict_types=1);
 namespace DPay\Tests\Refund;
 
 use DPay\Config;
+use DPay\Exception\ApiServerException;
 use DPay\Exception\AuthenticationException;
+use DPay\Exception\InvalidRequestException;
+use DPay\Exception\NotFoundException;
+use DPay\Exception\RateLimitException;
 use DPay\Internal\ApiRequestor;
 use DPay\Money;
 use DPay\Refund\RefundService;
@@ -128,5 +132,168 @@ final class RefundServiceTest extends TestCase
 
         self::assertFalse($availability->isAvailable());
         self::assertSame(401, $availability->getHttpStatus());
+    }
+
+    public function testAvailabilityMissingTransactionOn404IsNotAnException(): void
+    {
+        $this->http->queueJson(404, [
+            'status' => 'error',
+            'refund' => false,
+            'message' => 'Transaction does not exist!',
+            0 => 'Transaction does not exist!',
+        ]);
+
+        $availability = $this->service->checkAvailability('TX-404');
+
+        self::assertFalse($availability->isAvailable());
+        self::assertSame('Transaction does not exist!', $availability->getMessage());
+        self::assertSame(404, $availability->getHttpStatus());
+    }
+
+    public function testAvailabilityBuyerSupportRefusalOn423IsNotAnException(): void
+    {
+        $this->http->queueJson(423, [
+            'status' => 'error',
+            'refund' => false,
+            'code' => 'BUYER_SUPPORT_REFUND_NOT_APPLICABLE',
+            'message' => 'Zwrot przez BOK dpay',
+        ]);
+
+        $availability = $this->service->checkAvailability('TX-1');
+
+        self::assertFalse($availability->isAvailable());
+        self::assertSame(423, $availability->getHttpStatus());
+    }
+
+    public function testAvailabilityWithoutRefundKeyOrOnServerErrorThrows(): void
+    {
+        $this->http->queueJson(404, ['message' => 'Not Found']);
+        try {
+            $this->service->checkAvailability('TX-1');
+            self::fail('Expected NotFoundException');
+        } catch (NotFoundException $exception) {
+            self::assertSame(404, $exception->getHttpStatus());
+        }
+
+        $this->http->queueJson(500, ['status' => 'error', 'refund' => false, 'message' => 'Server error']);
+        $this->expectException(ApiServerException::class);
+        $this->service->checkAvailability('TX-1');
+    }
+
+    public function testRefundMessageIdGoesToTheHeaderNotTheChecksum(): void
+    {
+        $this->http->queueJson(200, ['status' => 'success', 'refund' => true, 'message' => 'dpay.pl zwrot RET-2026-0001']);
+
+        $refund = $this->service->create('30D9493D-1D73-3FBD-A5D4-633723CC7A68', null, null, null, 'RET-2026-0001');
+
+        self::assertSame('dpay.pl zwrot RET-2026-0001', $refund->getMessage());
+        $request = $this->http->lastRequest();
+        self::assertSame('RET-2026-0001', $request->getHeaders()['DigitalPayments-PSP-Message-ID']);
+        $body = $this->http->lastRequestBody();
+        self::assertSame(['service', 'transaction_id', 'checksum'], array_keys($body));
+        self::assertSame('3b345f55900ae6a43220dd14a3827ed9a26a02a3eb46b856d302e2baa44b48a4', $body['checksum']);
+    }
+
+    public function testRefundWithoutMessageIdSendsNoHeader(): void
+    {
+        $this->http->queueJson(200, ['status' => 'success', 'refund' => true, 'message' => 'dpay.pl TX']);
+
+        $this->service->create('TX-1');
+
+        self::assertArrayNotHasKey('DigitalPayments-PSP-Message-ID', $this->http->lastRequest()->getHeaders());
+    }
+
+    /**
+     * @dataProvider invalidMessageIds
+     */
+    public function testInvalidRefundMessageIdIsRejected(string $messageId): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->service->create('TX-1', null, null, null, $messageId);
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function invalidMessageIds(): array
+    {
+        return [
+            'empty' => [''],
+            'spaces only' => ['   '],
+            'line break' => ["RET\r\nX-Evil: 1"],
+            'non-ascii' => ['ZWROT-ŁÓDŹ'],
+        ];
+    }
+
+    public function testSignedStringsAreSentTrimmedLikeTheApiTrimsThem(): void
+    {
+        $this->http->queueJson(200, ['status' => 'success', 'refund' => true, 'message' => 'MSG-2']);
+        $config = Config::fromArray(['service' => "\u{00A0}MyShop ", 'secret_hash' => 'secret123']);
+        $service = new RefundService(new ApiRequestor($config, $this->http));
+
+        // " 30D9...\n" -> "30D9...", "\u{3000}reklamacja\u{200B}" -> "reklamacja": the same body and checksum as untrimmed input
+        $service->create(" 30D9493D-1D73-3FBD-A5D4-633723CC7A68\n", Money::pln(1500), "\u{3000}reklamacja\u{200B}");
+
+        $body = $this->http->lastRequestBody();
+        self::assertSame('MyShop', $body['service']);
+        self::assertSame('30D9493D-1D73-3FBD-A5D4-633723CC7A68', $body['transaction_id']);
+        self::assertSame('reklamacja', $body['reason']);
+        self::assertSame(hash('sha256', 'MyShop|30D9493D-1D73-3FBD-A5D4-633723CC7A68|15.00|reklamacja|secret123'), $body['checksum']);
+        self::assertSame('5c00684addf39fda89d3d6cff88abf26bb8173119056fd3012050422943c798a', $body['checksum']);
+    }
+
+    public function testReasonBlankAfterTrimmingIsSentEmptyAndHashedAsAnEmptySegment(): void
+    {
+        $this->http->queueJson(200, ['status' => 'success', 'refund' => true, 'message' => 'Refund available']);
+
+        $this->service->checkAvailability('30D9493D-1D73-3FBD-A5D4-633723CC7A68', Money::pln(1500), "\u{FEFF} \n");
+
+        $body = $this->http->lastRequestBody();
+        self::assertSame(['service', 'transaction_id', 'value', 'reason', 'checksum'], array_keys($body));
+        self::assertSame('', $body['reason']);
+        self::assertSame(hash('sha256', 'MyShop|30D9493D-1D73-3FBD-A5D4-633723CC7A68|15.00||secret123'), $body['checksum']);
+        self::assertSame('12dcb016aa2302bbe8ea71be9007eeacdedaeab1d4dc317966bab1b1e8d53a1c', $body['checksum']);
+    }
+
+    public function testBlankTransactionIdIsRejectedBeforeTheRequest(): void
+    {
+        try {
+            $this->service->create("\u{00A0}\t");
+            self::fail('Expected InvalidArgumentException');
+        } catch (\InvalidArgumentException $exception) {
+            self::assertSame('transaction_id must not be empty', $exception->getMessage());
+        }
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('transaction_id must not be empty');
+        $this->service->checkAvailability('');
+    }
+
+    /**
+     * The answer is decided by the body: 422 and 429 throw because the API sends them without the `refund` key.
+     */
+    public function testAvailabilityValidationErrorAndRateLimitThrow(): void
+    {
+        $this->http->queueJson(422, ['message' => 'The service field is required.', 'errors' => ['service' => ['The service field is required.']]]);
+        try {
+            $this->service->checkAvailability('TX-1');
+            self::fail('Expected InvalidRequestException');
+        } catch (InvalidRequestException $exception) {
+            self::assertSame(422, $exception->getHttpStatus());
+        }
+
+        $this->http->queueJson(429, ['status' => 'error', 'message' => 'Too Many Requests', 'error' => 'Too Many Requests'], ['Retry-After' => '12']);
+        $this->expectException(RateLimitException::class);
+        $this->service->checkAvailability('TX-1');
+    }
+
+    public function testAvailabilityAnyOther4xxWithTheRefundKeyIsAnAnswer(): void
+    {
+        $this->http->queueJson(422, ['status' => 'error', 'refund' => false, 'message' => 'Refund not possible']);
+
+        $availability = $this->service->checkAvailability('TX-1');
+
+        self::assertFalse($availability->isAvailable());
+        self::assertSame(422, $availability->getHttpStatus());
     }
 }

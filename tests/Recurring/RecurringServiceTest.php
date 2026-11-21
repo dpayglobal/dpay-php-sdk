@@ -85,6 +85,7 @@ final class RecurringServiceTest extends TestCase
             'checksum' => '00bceec5fca2ee4c3a1737156df376441d225790eb61ca47fcbe9cba7243a77d',
         ], $this->http->lastRequestBody());
         self::assertTrue($result->isPending());
+        self::assertFalse($result->isSuccess());
         self::assertSame(1, $result->getCount());
         self::assertSame(self::TRANSACTION_ID, $result->getTransactionId());
     }
@@ -110,8 +111,21 @@ final class RecurringServiceTest extends TestCase
             $this->service->retry(self::TRANSACTION_ID);
             self::fail('Expected InvalidRequestException');
         } catch (InvalidRequestException $exception) {
-            self::assertSame(['DECLINE_NOT_RETRYABLE'], $exception->getFieldErrors()['retry']);
+            self::assertSame([\DPay\Recurring\RetryRefusal::DECLINE_NOT_RETRYABLE], $exception->getFieldErrors()['retry']);
+            self::assertSame(['SEC_DECLINED'], $exception->getFieldErrors()['decline_reason']);
             self::assertSame(400, $exception->getHttpStatus());
         }
+    }
+
+    public function testRetrySucceededAtOnce(): void
+    {
+        $this->http->queueJson(200, ['status' => 'success', 'data' => ['transactionId' => self::TRANSACTION_ID, 'retry' => ['status' => 'success', 'count' => 1]]]);
+
+        $result = $this->service->retry(self::TRANSACTION_ID);
+
+        self::assertTrue($result->isSuccess());
+        self::assertFalse($result->isPending());
+        self::assertFalse($result->isFailed());
+        self::assertCount(8, \DPay\Recurring\RetryRefusal::ALL);
     }
 }

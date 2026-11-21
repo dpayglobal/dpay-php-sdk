@@ -7,10 +7,16 @@ namespace DPay\Payout;
 use DPay\Currency;
 use DPay\Money;
 
+/**
+ * Payout header: `withdraws/details`, and `settlement` of `withdraws/details/full` (PayoutSettlement). Amounts are
+ * in getCurrency() - `currency_code` when the API sends it, otherwise PLN.
+ */
 final class PayoutDetails
 {
     /** @var array<mixed> */
     private array $raw;
+
+    private string $currency;
 
     private int $id;
 
@@ -42,28 +48,28 @@ final class PayoutDetails
     private function __construct(array $raw)
     {
         $this->raw = $raw;
+        $currency = $raw['currency_code'] ?? null;
+        $this->currency = is_string($currency) && Currency::isValid($currency) ? $currency : Currency::PLN;
         $this->id = isset($raw['id']) && is_scalar($raw['id']) ? (int) $raw['id'] : 0;
         $this->state = isset($raw['state']) && is_scalar($raw['state']) ? (int) $raw['state'] : 0;
-        $this->net = Money::tryFromApiNumber($raw['net'] ?? 0, Currency::PLN) ?? Money::pln(0);
-        $this->fee = Money::tryFromApiNumber($raw['fee'] ?? 0, Currency::PLN) ?? Money::pln(0);
-        $this->gross = Money::tryFromApiNumber($raw['gross'] ?? 0, Currency::PLN) ?? Money::pln(0);
+        $zero = Money::of(0, $this->currency);
+        $this->net = Money::tryFromApiNumber($raw['net'] ?? 0, $this->currency) ?? $zero;
+        $this->fee = Money::tryFromApiNumber($raw['fee'] ?? 0, $this->currency) ?? $zero;
+        $this->gross = Money::tryFromApiNumber($raw['gross'] ?? 0, $this->currency) ?? $zero;
         $this->creationDate = isset($raw['creation_date']) && is_string($raw['creation_date'])
             ? $raw['creation_date']
             : null;
-        $this->directSettlement = isset($raw['direct_settlement']) && is_scalar($raw['direct_settlement'])
-            ? (int) $raw['direct_settlement'] === 1
-            : false;
+        // The API sends its 0/1 flags as JSON integers - only the integer 1 is true
+        $this->directSettlement = ($raw['direct_settlement'] ?? null) === 1;
         $this->nrb = isset($raw['nrb']) && is_string($raw['nrb']) ? $raw['nrb'] : null;
-        $this->declined = isset($raw['declined']) && is_scalar($raw['declined'])
-            ? (int) $raw['declined'] === 1
-            : false;
+        $this->declined = ($raw['declined'] ?? null) === 1;
         $this->declineReason = isset($raw['decline_reason']) && is_string($raw['decline_reason'])
             ? $raw['decline_reason']
             : null;
         $this->declineStatus = isset($raw['decline_status']) && is_string($raw['decline_status'])
             ? $raw['decline_status']
             : null;
-        $this->receiver = is_array($raw['receiver'] ?? null) ? PayoutReceiver::fromArray($raw['receiver']) : null;
+        $this->receiver = is_array($raw['receiver'] ?? null) ? PayoutReceiver::fromArray($raw['receiver'], $this->currency) : null;
     }
 
     /**
@@ -86,17 +92,17 @@ final class PayoutDetails
 
     public function isWaiting(): bool
     {
-        return $this->state === 0;
+        return $this->state === PayoutState::WAITING;
     }
 
     public function isProcessed(): bool
     {
-        return $this->state === 1;
+        return $this->state === PayoutState::PROCESSED;
     }
 
     public function isFailed(): bool
     {
-        return $this->state === -1;
+        return $this->state === PayoutState::FAILED;
     }
 
     public function getNet(): Money
@@ -114,9 +120,29 @@ final class PayoutDetails
         return $this->gross;
     }
 
+    /** Currency of the amounts (`currency_code`; PLN when the API does not send it). */
+    public function getCurrency(): string
+    {
+        return $this->currency;
+    }
+
     public function getCreationDate(): ?string
     {
         return $this->creationDate;
+    }
+
+    /** When the transfer was sent to the bank (`withdraws/details/full` only); null until then. */
+    public function getExportDate(): ?string
+    {
+        $exportDate = $this->raw['export_date'] ?? null;
+
+        return is_string($exportDate) ? $exportDate : null;
+    }
+
+    /** Paysafecard payout (`paysafecard` is the JSON integer 1; sent only for regular, non-direct settlements). */
+    public function isPaysafecard(): bool
+    {
+        return ($this->raw['paysafecard'] ?? null) === 1;
     }
 
     public function isDirectSettlement(): bool
